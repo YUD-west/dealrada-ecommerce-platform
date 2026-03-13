@@ -14,18 +14,19 @@ const toReference = (value: string) => {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const guard = requireAdmin();
   if ("response" in guard) return guard.response;
 
+  const { id } = await params;
   initDb();
   const body = (await request.json()) as { status?: "OPEN" | "RESOLVED" };
   if (!body.status) {
     return NextResponse.json({ error: "Status required." }, { status: 400 });
   }
 
-  const reference = toReference(params.id);
+  const reference = toReference(id);
   const result = db
     .prepare(`UPDATE disputes SET status = ? WHERE reference = ?`)
     .run(body.status, reference);
