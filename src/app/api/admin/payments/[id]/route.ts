@@ -5,11 +5,12 @@ import { requireAdmin } from "@/lib/admin";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const guard = requireAdmin();
   if ("response" in guard) return guard.response;
 
+  const { id } = await params;
   initDb();
   const body = (await request.json()) as {
     enabled?: boolean;
@@ -42,7 +43,7 @@ export async function PATCH(
     );
   }
 
-  values.push(params.id);
+  values.push(id);
   const result = db
     .prepare(`UPDATE payment_methods SET ${updates.join(", ")} WHERE id = ?`)
     .run(...values);
@@ -59,15 +60,16 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const guard = requireAdmin();
   if ("response" in guard) return guard.response;
 
+  const { id } = await params;
   initDb();
   const result = db
     .prepare(`DELETE FROM payment_methods WHERE id = ?`)
-    .run(params.id);
+    .run(id);
 
   if (result.changes === 0) {
     return NextResponse.json(
