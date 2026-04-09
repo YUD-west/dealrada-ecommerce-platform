@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type NotificationItem = {
   id: number;
@@ -27,17 +27,21 @@ export default function NotificationBell() {
     }
   };
 
-  useEffect(() => {
-    loadNotifications();
-  }, []);
-
   const unreadCount = items.length;
 
   return (
     <div className="relative">
       <button
         className="relative rounded-full border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          setOpen((prev) => {
+            const next = !prev;
+            if (next) {
+              void loadNotifications();
+            }
+            return next;
+          });
+        }}
         aria-label="Notifications"
       >
         🔔

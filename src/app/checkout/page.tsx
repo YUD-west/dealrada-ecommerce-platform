@@ -9,6 +9,13 @@ import useLanguage from "@/components/useLanguage";
 export default function CheckoutPage() {
   const language = useLanguage();
   const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [mobileMethods, setMobileMethods] = useState<
+    Array<{ id: string; label: string }>
+  >([
+    { id: "telebirr", label: "Telebirr" },
+    { id: "cbe-birr", label: "CBE Birr" },
+    { id: "mpesa", label: "M-Pesa" },
+  ]);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [guestCheckout, setGuestCheckout] = useState(true);
@@ -26,11 +33,6 @@ export default function CheckoutPage() {
     wallet: "",
     transactionId: "",
   });
-  const [mobileProviders, setMobileProviders] = useState<string[]>([
-    "Telebirr",
-    "CBE Birr",
-    "M-Pesa",
-  ]);
   const [selectedProvider, setSelectedProvider] = useState("Telebirr");
   const t =
     language === "am"
@@ -149,10 +151,10 @@ export default function CheckoutPage() {
         };
         const providers = data.items
           .filter((item) => item.enabled && item.id !== "cod")
-          .map((item) => item.label);
+          .map((item) => ({ id: item.id, label: item.label }));
         if (providers.length > 0) {
-          setMobileProviders(providers);
-          setSelectedProvider(providers[0]);
+          setMobileMethods(providers);
+          setSelectedProvider(providers[0].label);
         }
       } catch {
         // Keep fallback providers if API fails.
@@ -189,17 +191,14 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
-    if (paymentMethod === "telebirr") {
-      setSelectedProvider("Telebirr");
-    }
-    if (paymentMethod === "cbe-birr") {
-      setSelectedProvider("CBE Birr");
-    }
     if (paymentMethod === "cod") {
       setPaymentRef(null);
       setPaymentInstructions(null);
+      return;
     }
-  }, [paymentMethod]);
+    const method = mobileMethods.find((item) => item.id === paymentMethod);
+    if (method) setSelectedProvider(method.label);
+  }, [paymentMethod, mobileMethods]);
 
   const handleChange = (
     event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -461,8 +460,11 @@ export default function CheckoutPage() {
                   onChange={(event) => setPaymentMethod(event.target.value)}
                 >
                   <option value="cod">{t.codDefault}</option>
-                  <option value="telebirr">{t.telebirr}</option>
-                  <option value="cbe-birr">{t.cbeBirr}</option>
+                  {mobileMethods.map((method) => (
+                    <option key={method.id} value={method.id}>
+                      {method.label}
+                    </option>
+                  ))}
                 </select>
                 <div className="text-xs text-emerald-700">
                   {t.telebirrNote}
@@ -490,9 +492,9 @@ export default function CheckoutPage() {
                         setSelectedProvider(event.target.value)
                       }
                     >
-                      {mobileProviders.map((provider) => (
-                        <option key={provider} value={provider}>
-                          {provider}
+                      {mobileMethods.map((provider) => (
+                        <option key={provider.id} value={provider.label}>
+                          {provider.label}
                         </option>
                       ))}
                     </select>

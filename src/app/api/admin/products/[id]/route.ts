@@ -5,11 +5,12 @@ import { requireAdmin } from "@/lib/admin";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const guard = requireAdmin();
+  const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
+  const { id } = await params;
   initDb();
   const body = (await request.json()) as { status?: "APPROVED" | "REJECTED" };
   if (!body.status) {
@@ -18,7 +19,7 @@ export async function PATCH(
 
   db.prepare(`UPDATE products SET status = ? WHERE id = ?`).run(
     body.status,
-    params.id
+    id
   );
 
   return NextResponse.json({ success: true });

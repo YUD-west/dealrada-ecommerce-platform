@@ -28,6 +28,12 @@ export default function SupportPage() {
           issuePlaceholder: "ለምሳሌ፣ የትዕዛዝ ቁጥር DA-1023 የሚገኙ ችግሮች...",
           submit: "ቅሬታ ያስገቡ",
           recent: "ቅርብ የተከፈቱ ጉዳዮች",
+          trackOrder: "ትዕዛዝ ክትትል",
+          cart: "ጋሪ",
+          issueRequired: "እባክዎ ችግሩን ይግለጹ።",
+          ticketCreated: "ትኬትዎ ተፈጥሯል።",
+          ticketSubmitFailed: "ትኬት ማስገባት አልተሳካም።",
+          noTickets: "እስካሁን ምንም ትኬት አልተገኘም።",
         }
       : {
           title: "Support",
@@ -40,6 +46,12 @@ export default function SupportPage() {
             "Example: Order DA-1023 arrived late or missing item...",
           submit: "Submit dispute",
           recent: "Recent tickets",
+          trackOrder: "Track order",
+          cart: "Cart",
+          issueRequired: "Please describe the issue.",
+          ticketCreated: "Your ticket has been created.",
+          ticketSubmitFailed: "Failed to submit ticket.",
+          noTickets: "No tickets found yet.",
         };
 
   const loadDisputes = async () => {
@@ -61,7 +73,7 @@ export default function SupportPage() {
     setMessage(null);
     const trimmed = issue.trim();
     if (!trimmed) {
-      setMessage("Please describe the issue.");
+      setMessage(t.issueRequired);
       return;
     }
     try {
@@ -74,11 +86,11 @@ export default function SupportPage() {
         throw new Error("Unable to submit dispute.");
       }
       setIssue("");
-      setMessage("Your ticket has been created.");
+      setMessage(t.ticketCreated);
       loadDisputes();
     } catch (error) {
       setMessage(
-        error instanceof Error ? error.message : "Failed to submit ticket."
+        error instanceof Error ? error.message : t.ticketSubmitFailed
       );
     }
   };
@@ -91,8 +103,8 @@ export default function SupportPage() {
             DealArada
           </Link>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <Link href="/track">Track order</Link>
-            <Link href="/cart">Cart</Link>
+            <Link href="/track">{t.trackOrder}</Link>
+            <Link href="/cart">{t.cart}</Link>
           </div>
         </div>
       </header>
@@ -144,7 +156,7 @@ export default function SupportPage() {
                 ))}
                 {disputes.length === 0 && (
                   <p className="text-xs text-slate-400">
-                    No tickets found yet.
+                    {t.noTickets}
                   </p>
                 )}
               </div>

@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { initDb } from "@/lib/seed";
+import { requireAdmin } from "@/lib/admin";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
+  const { id: orderCode } = await params;
   initDb();
   const body = (await request.json()) as { status?: string };
   if (!body.status) {
@@ -14,7 +19,7 @@ export async function PATCH(
 
   const order = db
     .prepare(`SELECT id FROM orders WHERE order_code = ?`)
-    .get(params.id) as { id?: number } | undefined;
+    .get(orderCode) as { id?: number } | undefined;
 
   if (!order?.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -32,7 +37,7 @@ export async function PATCH(
     null,
     "BUYER",
     "IN_APP",
-    `Order ${params.id} updated to ${body.status}.`,
+    `Order ${orderCode} updated to ${body.status}.`,
     "SENT",
     new Date().toISOString()
   );
@@ -43,7 +48,7 @@ export async function PATCH(
        FROM notification_subscriptions
        WHERE order_code = ?`
     )
-    .all(params.id) as Array<{ channel: string; contact: string | null }>;
+    .all(orderCode) as Array<{ channel: string; contact: string | null }>;
   const insertNotification = db.prepare(
     `INSERT INTO notifications (user_id, role, channel, message, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
@@ -54,7 +59,7 @@ export async function PATCH(
       null,
       "BUYER",
       subscription.channel,
-      `Order ${params.id} updated to ${body.status}${
+      `Order ${orderCode} updated to ${body.status}${
         subscription.contact ? ` (${subscription.contact})` : ""
       }.`,
       "SENT",

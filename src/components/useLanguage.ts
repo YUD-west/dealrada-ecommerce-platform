@@ -2,27 +2,33 @@
 
 import { useEffect, useState } from "react";
 import type { Language } from "@/lib/i18n";
+import {
+  applyLanguageToDocument,
+  getSavedLanguage,
+  isLanguage,
+  LANG_STORAGE_KEY,
+  setLanguagePreference,
+} from "@/lib/language";
 
 const DEFAULT_LANG: Language = "en";
 
 export default function useLanguage() {
-  const [language, setLanguage] = useState<Language>(DEFAULT_LANG);
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof document === "undefined") return DEFAULT_LANG;
+    const fromHtml = document.documentElement.lang;
+    return isLanguage(fromHtml) ? fromHtml : DEFAULT_LANG;
+  });
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("dealarada-lang") as Language | null;
-    if (saved === "en" || saved === "am") {
-      setLanguage(saved);
-    }
-
     const handleStorage = (event: StorageEvent) => {
-      if (event.key === "dealarada-lang" && (event.newValue === "en" || event.newValue === "am")) {
+      if (event.key === LANG_STORAGE_KEY && isLanguage(event.newValue)) {
         setLanguage(event.newValue);
       }
     };
 
     const handleCustom = (event: Event) => {
       const detail = (event as CustomEvent<Language>).detail;
-      if (detail === "en" || detail === "am") {
+      if (isLanguage(detail)) {
         setLanguage(detail);
       }
     };
@@ -30,11 +36,21 @@ export default function useLanguage() {
     window.addEventListener("storage", handleStorage);
     window.addEventListener("dealarada:lang", handleCustom);
 
+    const saved = getSavedLanguage();
+    if (saved) {
+      // Align cookie/html + trigger our custom event for same-tab updates.
+      setLanguagePreference(saved);
+    }
+
     return () => {
       window.removeEventListener("storage", handleStorage);
       window.removeEventListener("dealarada:lang", handleCustom);
     };
   }, []);
+
+  useEffect(() => {
+    applyLanguageToDocument(language);
+  }, [language]);
 
   return language;
 }

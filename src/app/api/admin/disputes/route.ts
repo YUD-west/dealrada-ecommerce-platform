@@ -12,7 +12,7 @@ const formatStatus = (value: string) =>
     .join(" ");
 
 export async function GET() {
-  const guard = requireAdmin();
+  const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
   initDb();

@@ -1,15 +1,20 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { initDb } from "@/lib/seed";
+import { requireRoles } from "@/lib/access";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await requireRoles(["RIDER"]);
+  if ("response" in guard) return guard.response;
+
+  const { id: orderCode } = await params;
   initDb();
   const order = db
     .prepare(`SELECT id FROM orders WHERE order_code = ?`)
-    .get(params.id) as { id?: number } | undefined;
+    .get(orderCode) as { id?: number } | undefined;
 
   if (!order?.id) {
     return NextResponse.json({ items: [], total: 0 }, { status: 404 });

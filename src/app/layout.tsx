@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import "./globals.css";
 import LanguageToggle from "@/components/LanguageToggle";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
@@ -29,14 +30,18 @@ export const viewport: Viewport = {
   themeColor: "#10b981",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieStore = await cookies();
+  const initialLang = cookieStore.get("dealarada-lang")?.value === "am" ? "am" : "en";
+
   return (
-    <html lang="en">
+    <html lang={initialLang} suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <LanguageToggle />

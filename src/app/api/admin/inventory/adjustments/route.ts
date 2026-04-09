@@ -4,7 +4,7 @@ import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 export async function GET(request: Request) {
-  const guard = requireAdmin();
+  const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
   initDb();

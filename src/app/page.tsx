@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { Language } from "@/lib/i18n";
 import useLanguage from "@/components/useLanguage";
 import NotificationBell from "@/components/NotificationBell";
+import { setLanguagePreference } from "@/lib/language";
+import AdminLink from "@/components/AdminLink";
 
 export default function Home() {
   const language = useLanguage();
@@ -13,7 +15,19 @@ export default function Home() {
   const [flashCountdown, setFlashCountdown] = useState(4 * 60 * 60 + 12 * 60 + 32);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = window.localStorage.getItem("dealarada-recent-searches");
+      if (!saved) return [];
+      const parsed = JSON.parse(saved) as unknown;
+      return Array.isArray(parsed) && parsed.every((item) => typeof item === "string")
+        ? (parsed as string[])
+        : [];
+    } catch {
+      return [];
+    }
+  });
   const [filters, setFilters] = useState({
     price: "Any",
     location: "Woliso",
@@ -228,14 +242,9 @@ export default function Home() {
           footerContact: "Contact",
           view: "View",
         };
-  const setLanguagePreference = (next: Language) => {
-    if (next === language || typeof window === "undefined") {
-      return;
-    }
-    window.localStorage.setItem("dealarada-lang", next);
-    window.dispatchEvent(
-      new CustomEvent<Language>("dealarada:lang", { detail: next })
-    );
+  const setLanguage = (next: Language) => {
+    if (next === language) return;
+    setLanguagePreference(next);
   };
 
   useEffect(() => {
@@ -275,16 +284,6 @@ export default function Home() {
     };
     document.addEventListener("mouseout", handleExit);
     return () => document.removeEventListener("mouseout", handleExit);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-    const saved = window.localStorage.getItem("dealarada-recent-searches");
-    if (saved) {
-      setRecentSearches(JSON.parse(saved) as string[]);
-    }
   }, []);
 
   useEffect(() => {
@@ -634,7 +633,7 @@ export default function Home() {
               <div className="flex overflow-hidden rounded-full border border-white/20 bg-white/10">
                 <button
                   type="button"
-                  onClick={() => setLanguagePreference("am")}
+                  onClick={() => setLanguage("am")}
                   className={`px-3 py-1 text-xs font-semibold transition ${
                     language === "am"
                       ? "bg-white text-slate-900"
@@ -645,7 +644,7 @@ export default function Home() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setLanguagePreference("en")}
+                  onClick={() => setLanguage("en")}
                   className={`px-3 py-1 text-xs font-semibold transition ${
                     language === "en"
                       ? "bg-white text-slate-900"
@@ -899,6 +898,7 @@ export default function Home() {
 
           <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap md:justify-end">
             <NotificationBell />
+            <AdminLink />
             <Link
               href="/login"
               className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"

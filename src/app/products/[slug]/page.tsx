@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import useLanguage from "@/components/useLanguage";
 
@@ -403,8 +403,7 @@ export default function ProductPage() {
             "Review submitted. It will appear after moderation.",
           reviewFailed: "Failed to post review.",
           reviewReward:
-            "ለተረጋገጠ ግምገማ 5 ብር ክሬዲት ያግኙ።",
-          reviewReward: "Earn rewards for reviews: get 5 ETB credit after a verified review.",
+            "Earn rewards for reviews: get 5 ETB credit after a verified review.",
           reviewPhotos: "Review photos",
           faq: "FAQ",
           faqDeliveryQ: "How fast is delivery?",
@@ -416,6 +415,8 @@ export default function ProductPage() {
           relatedItems: "Related items",
           viewAll: "View all",
           ratingFormat: "Rating {rating} / 5",
+          stars: "stars",
+          quickFeedbackPlaceholder: "Share quick feedback",
         };
   const product =
     productMap[slug ?? ""] ?? {
@@ -502,7 +503,7 @@ export default function ProductPage() {
     return (fromReviews.length > 0 ? fromReviews : fallback).slice(0, 4);
   }, [reviews]);
 
-  const loadReviews = async () => {
+  const loadReviews = useCallback(async () => {
     try {
       const response = await fetch(
         `/api/reviews?product=${encodeURIComponent(product.name)}`
@@ -521,11 +522,11 @@ export default function ProductPage() {
     } catch {
       // Ignore review errors.
     }
-  };
+  }, [product.name]);
 
   useEffect(() => {
     loadReviews();
-  }, [product.name]);
+  }, [loadReviews]);
 
   useEffect(() => {
     const loadAuth = async () => {
@@ -768,13 +769,13 @@ export default function ProductPage() {
               >
                 {[5, 4, 3, 2, 1].map((value) => (
                   <option key={value} value={value}>
-                    {value} stars
+                    {value} {t.stars}
                   </option>
                 ))}
               </select>
               <input
                 className="rounded-xl border border-slate-200 px-3 py-2 text-sm"
-                placeholder="Share quick feedback"
+                placeholder={t.quickFeedbackPlaceholder}
                 value={reviewForm.note}
                 onChange={(event) =>
                   setReviewForm((prev) => ({

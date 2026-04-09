@@ -179,22 +179,18 @@ export function initDb() {
   ensureColumn("reviews", "photo_url", "TEXT");
   ensureColumn("reviews", "status", "TEXT NOT NULL DEFAULT 'APPROVED'");
 
-  const paymentCount = db
-    .prepare("SELECT COUNT(*) as count FROM payment_methods")
-    .get().count as number;
+  const getCount = (table: string) => {
+    const row = db
+      .prepare(`SELECT COUNT(*) as count FROM ${table}`)
+      .get() as { count?: number } | undefined;
+    return Number(row?.count ?? 0);
+  };
 
-  const disputeCount = db.prepare("SELECT COUNT(*) as count FROM disputes").get()
-    .count as number;
-
-  const deliveryHistoryCount = db
-    .prepare("SELECT COUNT(*) as count FROM delivery_status_history")
-    .get().count as number;
-
-  const productCount = db.prepare("SELECT COUNT(*) as count FROM products").get()
-    .count as number;
-
-  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get()
-    .count as number;
+  const paymentCount = getCount("payment_methods");
+  const disputeCount = getCount("disputes");
+  const deliveryHistoryCount = getCount("delivery_status_history");
+  const productCount = getCount("products");
+  const userCount = getCount("users");
 
   if (paymentCount === 0) {
     const insertPayment = db.prepare(
@@ -205,7 +201,7 @@ export function initDb() {
       { id: "cod", label: "Cash on delivery", enabled: 1, sortOrder: 1 },
       { id: "telebirr", label: "Telebirr", enabled: 1, sortOrder: 2 },
       { id: "cbe-birr", label: "CBE Birr", enabled: 1, sortOrder: 3 },
-      { id: "mpesa", label: "M-Pesa", enabled: 0, sortOrder: 4 },
+      { id: "mpesa", label: "M-Pesa", enabled: 1, sortOrder: 4 },
     ];
     const insertPayments = db.transaction(() => {
       for (const method of payments) {

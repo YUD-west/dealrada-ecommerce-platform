@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import useLanguage from "@/components/useLanguage";
 import {
-  translateOrderStatus,
   translateTrackingDetail,
   translateTrackingTitle,
 } from "@/lib/i18n";
@@ -58,6 +57,36 @@ export default function TrackPage() {
   const [smsPhone, setSmsPhone] = useState("");
   const [telegramUser, setTelegramUser] = useState("@SatoshiFlash");
   const [emailAddress, setEmailAddress] = useState("");
+  const t =
+    language === "am"
+      ? {
+          shop: "ሱቅ",
+          cart: "ጋሪ",
+          track: "ክትትል",
+          orderIdPlaceholder: "የትዕዛዝ መለያ (ለምሳሌ፣ DA-1023)",
+          deliveryEta: "የመድረሻ ጊዜ (ETA)",
+          rider: "ራይደር",
+          mapSoon: "የካርታ እይታ በቅርቡ ይጨምራል",
+          failedEnable: "ማስታወቂያዎችን ማንቃት አልተሳካም።",
+          enabledSms: "የSMS ማስታወቂያ ተነቅቷል።",
+          enabledEmail: "የኢሜይል ማስታወቂያ ተነቅቷል።",
+          enabledTelegram: "የTelegram ማስታወቂያ ተነቅቷል።",
+          enabledFor: "ለ{contact} ተነቅቷል።",
+        }
+      : {
+          shop: "Shop",
+          cart: "Cart",
+          track: "Track",
+          orderIdPlaceholder: "Order ID (e.g., DA-1023)",
+          deliveryEta: "Delivery ETA",
+          rider: "Rider",
+          mapSoon: "Live rider map coming soon",
+          failedEnable: "Failed to enable updates.",
+          enabledSms: "SMS updates enabled.",
+          enabledEmail: "Email updates enabled.",
+          enabledTelegram: "Telegram updates enabled.",
+          enabledFor: "enabled for {contact}.",
+        };
 
   useEffect(() => {
     const loadTracking = async () => {
@@ -118,21 +147,21 @@ export default function TrackPage() {
       if (!response.ok) {
         throw new Error("Failed to trigger notification.");
       }
-      setNotifyMessage(
+      const enabledBase =
         channel === "SMS"
-          ? smsPhone.trim()
-            ? `SMS updates enabled for ${smsPhone.trim()}.`
-            : "SMS updates enabled."
+          ? t.enabledSms
           : channel === "EMAIL"
-            ? email
-              ? `Email updates enabled for ${email}.`
-              : "Email updates enabled."
-            : telegramHandle
-              ? `Telegram updates enabled for ${telegramHandle}.`
-              : "Telegram updates enabled."
+            ? t.enabledEmail
+            : t.enabledTelegram;
+      setNotifyMessage(
+        contactLabel
+          ? language === "am"
+            ? `${enabledBase} ${t.enabledFor.replace("{contact}", contactLabel)}`
+            : `${enabledBase.slice(0, -1)} ${t.enabledFor.replace("{contact}", contactLabel)}`
+          : enabledBase
       );
     } catch {
-      setNotifyMessage("Failed to enable updates.");
+      setNotifyMessage(t.failedEnable);
     }
   };
 
@@ -144,8 +173,8 @@ export default function TrackPage() {
             DealArada
           </Link>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <Link href="/categories">Shop</Link>
-            <Link href="/cart">Cart</Link>
+            <Link href="/categories">{t.shop}</Link>
+            <Link href="/cart">{t.cart}</Link>
           </div>
         </div>
       </header>
@@ -172,10 +201,10 @@ export default function TrackPage() {
             <div className="flex flex-wrap gap-3">
               <input
                 className="flex-1 rounded-xl border border-slate-200 px-4 py-2 text-sm"
-                placeholder="Order ID (e.g., DA-1023)"
+                placeholder={t.orderIdPlaceholder}
               />
               <button className="rounded-full bg-emerald-600 px-5 py-2 text-sm font-semibold text-white">
-                Track
+                {t.track}
               </button>
             </div>
 
@@ -212,18 +241,16 @@ export default function TrackPage() {
                   <p className="text-sm font-semibold">
                     {language === "am"
                       ? "የመድረሻ ጊዜ (ETA)"
-                      : "Delivery ETA"}
+                      : t.deliveryEta}
                   </p>
                   <p className="text-xs text-slate-500">{etaText}</p>
                 </div>
                 <div className="text-xs text-slate-500">
-                  {language === "am" ? "ራይደር: ሲሳይ" : "Rider: Sisay"}
+                  {language === "am" ? `${t.rider}: ሲሳይ` : `${t.rider}: Sisay`}
                 </div>
               </div>
               <div className="mt-3 h-40 w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500">
-                {language === "am"
-                  ? "የካርታ እይታ በቅርቡ ይጨምራል"
-                  : "Live rider map coming soon"}
+                {t.mapSoon}
               </div>
             </div>
           </div>

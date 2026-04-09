@@ -15,13 +15,14 @@ const storeMap: Record<string, { name: string; highlight: string }> = {
   },
 };
 
-export default function StoreLandingPage({
+export default async function StoreLandingPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
+  const { slug } = await params;
   const store =
-    storeMap[params.slug] ?? {
+    storeMap[slug] ?? {
       name: "Featured seller",
       highlight: "Reliable products curated for Woliso customers.",
     };

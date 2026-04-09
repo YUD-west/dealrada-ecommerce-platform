@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { initDb } from "@/lib/seed";
+import { requireRoles } from "@/lib/access";
 
 export async function GET(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   initDb();
   const product = db
     .prepare(
@@ -13,7 +15,7 @@ export async function GET(
               price, currency, category, rating, stock, image, status
        FROM products WHERE id = ?`
     )
-    .get(params.id);
+    .get(id);
 
   if (!product) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -24,8 +26,12 @@ export async function GET(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await requireRoles(["SELLER"]);
+  if ("response" in guard) return guard.response;
+
+  const { id } = await params;
   initDb();
   const body = (await request.json()) as {
     name?: string;
@@ -43,14 +49,14 @@ export async function PATCH(
 
   const existing = db
     .prepare(`SELECT id, stock FROM products WHERE id = ?`)
-    .get(params.id) as { id?: number; stock?: number } | undefined;
+    .get(id) as { id?: number; stock?: number } | undefined;
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const hasStockChange = typeof body.stock === "number";
   const stockChange =
-    hasStockChange && typeof existing.stock === "number"
+    typeof body.stock === "number" && typeof existing.stock === "number"
       ? Math.trunc(body.stock) - existing.stock
       : 0;
 
@@ -68,7 +74,7 @@ export async function PATCH(
          image = COALESCE(@image, image),
          status = COALESCE(@status, status)
      WHERE id = @id`
-  ).run({ ...body, id: params.id });
+  ).run({ ...body, id });
 
   if (hasStockChange && stockChange !== 0) {
     db.prepare(
@@ -89,16 +95,20 @@ export async function PATCH(
               price, currency, category, rating, stock, image, status
        FROM products WHERE id = ?`
     )
-    .get(params.id);
+    .get(id);
 
   return NextResponse.json({ item: updated });
 }
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const guard = await requireRoles(["SELLER"]);
+  if ("response" in guard) return guard.response;
+
+  const { id } = await params;
   initDb();
-  db.prepare(`DELETE FROM products WHERE id = ?`).run(params.id);
+  db.prepare(`DELETE FROM products WHERE id = ?`).run(id);
   return NextResponse.json({ success: true });
 }

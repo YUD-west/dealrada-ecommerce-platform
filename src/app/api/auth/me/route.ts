@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { getUserBySession } from "@/lib/auth";
 
 export async function GET() {
-  const token = cookies().get("da_session")?.value ?? null;
+  const cookieStore = await cookies();
+  const token = cookieStore.get("da_session")?.value ?? null;
   const user = getUserBySession(token);
   if (!user) {
     return NextResponse.json({ user: null }, { status: 401 });

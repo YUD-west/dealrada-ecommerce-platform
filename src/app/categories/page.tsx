@@ -162,7 +162,7 @@ export default function CategoriesPage() {
           view: "View",
           itemsCount: "150+ items",
         };
-  const categoryLabel =
+  const categoryLabel: Record<string, string> | null =
     language === "am"
       ? {
           Groceries: "ምግቦች",

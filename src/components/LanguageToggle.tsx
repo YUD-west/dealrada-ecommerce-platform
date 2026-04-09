@@ -1,28 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-type Language = "en" | "am";
+import useLanguage from "@/components/useLanguage";
+import { setLanguagePreference } from "@/lib/language";
 
 export default function LanguageToggle() {
-  const [language, setLanguage] = useState<Language>("en");
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("dealarada-lang") as Language | null;
-    if (saved === "en" || saved === "am") {
-      setLanguage(saved);
-      document.documentElement.lang = saved;
-      document.documentElement.dataset.lang = saved;
-    }
-  }, []);
+  const language = useLanguage();
 
   const toggleLanguage = () => {
     const next = language === "en" ? "am" : "en";
-    setLanguage(next);
-    window.localStorage.setItem("dealarada-lang", next);
-    document.documentElement.lang = next;
-    document.documentElement.dataset.lang = next;
-    window.dispatchEvent(new CustomEvent("dealarada:lang", { detail: next }));
+    setLanguagePreference(next);
   };
 
   return (

@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { initDb } from "@/lib/seed";
+import { requireRoles } from "@/lib/access";
 
 export async function GET() {
+  const guard = await requireRoles(["SELLER"]);
+  if ("response" in guard) return guard.response;
+
   initDb();
   const rows = db
     .prepare(
@@ -23,6 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireRoles(["SELLER"]);
+  if ("response" in guard) return guard.response;
+
   initDb();
   const body = (await request.json()) as {
     amount?: number;

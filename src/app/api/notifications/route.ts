@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import db from "@/lib/db";
 import { initDb } from "@/lib/seed";
 import { getUserBySession } from "@/lib/auth";
+import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
   initDb();
@@ -28,6 +29,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   initDb();
   const body = (await request.json()) as {
     userId?: number | null;

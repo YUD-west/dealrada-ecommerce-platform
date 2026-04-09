@@ -26,13 +26,14 @@ const categoryMap: Record<string, { title: string; description: string }> = {
   },
 };
 
-export default function CategoryLandingPage({
+export default async function CategoryLandingPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
+  const { slug } = await params;
   const data =
-    categoryMap[params.slug] ?? {
+    categoryMap[slug] ?? {
       title: "Shop in Woliso",
       description:
         "Browse trusted sellers and discover daily deals across categories.",

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { put } from "@vercel/blob";
 
 export const runtime = "nodejs";
 
@@ -12,17 +11,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File required." }, { status: 400 });
   }
 
-  const bytes = await file.arrayBuffer();
-  const buffer = Buffer.from(bytes);
-  const uploadsDir = path.join(process.cwd(), "public", "uploads");
-  await mkdir(uploadsDir, { recursive: true });
+  try {
+    const ext = file.name.includes(".")
+      ? file.name.slice(file.name.lastIndexOf("."))
+      : ".png";
+    const filename = `upload-${Date.now()}-${Math.round(
+      Math.random() * 1e6
+    )}${ext}`;
 
-  const ext = path.extname(file.name) || ".png";
-  const filename = `upload-${Date.now()}-${Math.round(
-    Math.random() * 1e6
-  )}${ext}`;
-  const filepath = path.join(uploadsDir, filename);
-  await writeFile(filepath, buffer);
+    const blob = await put(filename, file, {
+      access: "public",
+      addRandomSuffix: false,
+    });
 
-  return NextResponse.json({ url: `/uploads/${filename}` }, { status: 201 });
+    return NextResponse.json({ url: blob.url }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Upload failed. Configure Vercel Blob token.",
+      },
+      { status: 500 }
+    );
+  }
 }

@@ -4,8 +4,9 @@ import { initDb } from "@/lib/seed";
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   initDb();
   const body = (await request.json()) as { status?: string };
   if (!body.status) {
@@ -14,7 +15,7 @@ export async function PATCH(
 
   db.prepare(`UPDATE reviews SET status = ? WHERE id = ?`).run(
     body.status.toUpperCase(),
-    Number(params.id)
+    Number(id)
   );
 
   return NextResponse.json({ success: true });

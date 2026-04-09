@@ -1,17 +1,27 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { initDb } from "@/lib/seed";
+import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   initDb();
-  const rows = db
+  const rows = (db
     .prepare(
       `SELECT order_code as id, customer_name as customer, total, currency, status, created_at as placedAt
        FROM orders
        ORDER BY created_at DESC`
     )
-    .all()
-    .map((row: { status: string }) => ({
+    .all() as Array<{
+    id: string;
+    customer: string;
+    total: number;
+    currency: string;
+    status: string;
+    placedAt: string;
+  }>).map((row) => ({
       ...row,
       status: row.status.replace("_", " "),
     }));
