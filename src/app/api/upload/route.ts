@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { requireRoles } from "@/lib/access";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const guard = await requireRoles(["SELLER", "ADMIN"]);
+  if ("response" in guard) return guard.response;
+
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
 

@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 type UserRow = {
@@ -24,8 +23,7 @@ export async function GET() {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT users.id, users.name, users.role, users.email,
               sellers.id as seller_id, sellers.status as seller_status
@@ -33,7 +31,7 @@ export async function GET() {
        LEFT JOIN sellers ON sellers.email = users.email
        ORDER BY users.id DESC`
     )
-    .all() as UserRow[];
+    .all()) as UserRow[];
 
   const items = rows.map((row) => {
     const isSeller = row.role === "SELLER";

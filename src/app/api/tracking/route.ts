@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 
 const statusSteps = [
   {
@@ -29,20 +28,31 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const orderCode = searchParams.get("orderId") ?? "DA-1023";
 
-  initDb();
-  const order = db
-    .prepare(
-      `SELECT order_code as orderCode, status, created_at as createdAt
-       FROM orders
-       WHERE order_code = ?
-       ORDER BY created_at DESC
-       LIMIT 1`
-    )
-    .get(orderCode) as
-    | { orderCode: string; status: string; createdAt: string }
-    | undefined;
+  type TrackRow = {
+    orderCode: string | null;
+    orderStatus: string | null;
+    orderCreatedAt: string | null;
+    histStatus: string | null;
+    histNote: string | null;
+    histCreatedAt: string | null;
+  };
 
-  if (!order) {
+  const rows = (await db.query(
+    `SELECT
+       o.order_code AS orderCode,
+       o.status AS orderStatus,
+       o.created_at AS orderCreatedAt,
+       h.status AS histStatus,
+       h.note AS histNote,
+       h.created_at AS histCreatedAt
+     FROM orders o
+     LEFT JOIN delivery_status_history h ON h.order_id = o.id
+     WHERE o.order_code = ?
+     ORDER BY o.created_at DESC, h.created_at ASC NULLS LAST`,
+    [orderCode]
+  )) as TrackRow[];
+
+  if (!rows.length || rows[0].orderCode == null) {
     return NextResponse.json({
       orderId: orderCode,
       status: "Not found",
@@ -50,20 +60,19 @@ export async function GET(request: Request) {
     });
   }
 
-  const history = db
-    .prepare(
-      `SELECT status, note, created_at as createdAt
-       FROM delivery_status_history
-       WHERE order_id = (
-         SELECT id FROM orders WHERE order_code = ? LIMIT 1
-       )
-       ORDER BY created_at ASC`
-    )
-    .all(orderCode) as Array<{
-    status: string;
-    note: string | null;
-    createdAt: string;
-  }>;
+  const order = {
+    orderCode: rows[0].orderCode,
+    status: rows[0].orderStatus!,
+    createdAt: rows[0].orderCreatedAt!,
+  };
+
+  const history = rows
+    .filter((r) => r.histStatus != null)
+    .map((r) => ({
+      status: r.histStatus!,
+      note: r.histNote,
+      createdAt: r.histCreatedAt!,
+    }));
 
   const statusToStep = new Map(statusSteps.map((step) => [step.key, step]));
   const timeline =

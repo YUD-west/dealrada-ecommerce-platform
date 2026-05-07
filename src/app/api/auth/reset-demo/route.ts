@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 
 type DemoAccount = {
   name: string;
@@ -37,29 +36,40 @@ const demoAccounts: DemoAccount[] = [
 ];
 
 export async function POST() {
-  initDb();
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available." }, { status: 404 });
+  }
 
   for (const account of demoAccounts) {
-    const existing = db
+    const existing = (await db
       .prepare(`SELECT id FROM users WHERE role = ?`)
-      .get(account.role) as { id?: number } | undefined;
+      .get(account.role)) as { id?: number } | undefined;
 
     if (existing?.id) {
-      db.prepare(
-        `UPDATE users
+      await db
+        .prepare(
+          `UPDATE users
          SET name = ?, email = ?, password_hash = ?
          WHERE id = ?`
-      ).run(
-        account.name,
-        account.email,
-        `demo:${account.password}`,
-        existing.id
-      );
+        )
+        .run(
+          account.name,
+          account.email,
+          `demo:${account.password}`,
+          existing.id
+        );
     } else {
-      db.prepare(
-        `INSERT INTO users (name, email, role, password_hash)
+      await db
+        .prepare(
+          `INSERT INTO users (name, email, role, password_hash)
          VALUES (?, ?, ?, ?)`
-      ).run(account.name, account.email, account.role, `demo:${account.password}`);
+        )
+        .run(
+          account.name,
+          account.email,
+          account.role,
+          `demo:${account.password}`
+        );
     }
   }
 

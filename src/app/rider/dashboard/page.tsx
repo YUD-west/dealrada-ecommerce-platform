@@ -37,12 +37,14 @@ export default function RiderDashboardPage() {
 
   const loadOrders = async () => {
     try {
-      const response = await fetch("/api/delivery/orders");
+      const response = await fetch("/api/delivery/orders", {
+        credentials: "include",
+      });
       if (!response.ok) return;
       const data = (await response.json()) as { items: DeliveryOrder[] };
-      setOrders(data.items);
+      setOrders(data.items ?? []);
     } catch {
-      // Ignore load errors.
+      setOrders([]);
     }
   };
 
@@ -56,24 +58,29 @@ export default function RiderDashboardPage() {
           return;
         }
         const data = (await response.json()) as {
-          user: { role: string; name: string };
+          user: { role: string; name: string } | null;
         };
-        setAuth(data.user);
-        setRiderName(data.user.name ?? "Rider");
+        setAuth(data.user ?? null);
+        setRiderName(data.user?.name ?? "Rider");
       } catch {
         setAuth(null);
       } finally {
         setAuthLoading(false);
       }
     };
-    loadAuth();
-    loadOrders();
+    void loadAuth();
   }, []);
+
+  useEffect(() => {
+    if (authLoading) return;
+    void loadOrders();
+  }, [authLoading]);
 
   const assignOrder = async (orderId: string) => {
     try {
       await fetch(`/api/delivery/orders/${orderId}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           riderName,
@@ -93,6 +100,7 @@ export default function RiderDashboardPage() {
     try {
       await fetch(`/api/delivery/orders/${orderId}`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           deliveryStatus,
@@ -106,7 +114,10 @@ export default function RiderDashboardPage() {
   };
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
     router.push("/login");
   };
 
@@ -144,20 +155,7 @@ export default function RiderDashboardPage() {
             Checking access...
           </div>
         )}
-        {!authLoading && !auth && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-600 shadow-sm">
-            You need to sign in as a rider to access this page.{" "}
-            <Link href="/login" className="font-semibold">
-              Go to login
-            </Link>
-          </div>
-        )}
-        {!authLoading && auth?.role !== "RIDER" && auth && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-600 shadow-sm">
-            Access denied. Rider role required.
-          </div>
-        )}
-        {!authLoading && auth?.role === "RIDER" && (
+        {!authLoading && (
           <>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -170,7 +168,7 @@ export default function RiderDashboardPage() {
                 </p>
               </div>
               <div className="flex items-center gap-3 text-sm text-slate-500">
-                <span>Signed in as {auth?.name}</span>
+                <span>Signed in as {auth?.name ?? "Rider"}</span>
                 <button
                   className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-emerald-200"
                   onClick={handleLogout}
@@ -207,7 +205,7 @@ export default function RiderDashboardPage() {
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">
-                          {order.total.toLocaleString()} {order.currency}
+                          {Number(order.total).toLocaleString()} {order.currency}
                         </p>
                         <p className="text-xs text-slate-500">
                           {order.deliveryStatus ?? "UNASSIGNED"}

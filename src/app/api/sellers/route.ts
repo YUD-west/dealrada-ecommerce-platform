@@ -1,25 +1,24 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
+import { normalizeAuthEmail } from "@/lib/auth";
 
 export async function GET() {
-  initDb();
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT sellers.id, sellers.name, sellers.status, sellers.category,
-              COALESCE(AVG(products.rating), 0) as rating
+              COALESCE(AVG(products.rating), 0)::float as rating
        FROM sellers
        LEFT JOIN products ON products.seller_id = sellers.id
        GROUP BY sellers.id
        ORDER BY sellers.id DESC`
     )
-    .all() as Array<{
-      id: number;
-      name: string;
-      status: string;
-      category: string | null;
-      rating: number;
-    }>;
+    .all()) as Array<{
+    id: number;
+    name: string;
+    status: string;
+    category: string | null;
+    rating: number;
+  }>;
 
   const formatStatus = (value: string) =>
     value
@@ -41,7 +40,6 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  initDb();
   const body = (await request.json()) as {
     name?: string;
     phone?: string;
@@ -58,14 +56,14 @@ export async function POST(request: Request) {
     );
   }
 
-  const email =
-    body.email?.trim() ||
-    `seller+${Date.now()}@dealarada.local`;
+  const email = normalizeAuthEmail(
+    body.email?.trim() || `seller+${Date.now()}@dealarada.local`
+  );
   const password = body.password?.trim() || "demo123";
 
-  const existing = db
-    .prepare(`SELECT id FROM users WHERE email = ?`)
-    .get(email) as { id?: number } | undefined;
+  const existing = (await db
+    .prepare(`SELECT id FROM users WHERE LOWER(TRIM(email)) = ?`)
+    .get(email)) as { id?: number } | undefined;
   if (existing?.id) {
     return NextResponse.json(
       { error: "Email is already registered." },
@@ -73,24 +71,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const result = db
+  const result = await db
     .prepare(
       `INSERT INTO users (name, email, role, password_hash)
        VALUES (?, ?, ?, ?)`
     )
     .run(body.name, email, "SELLER", `demo:${password}`);
 
-  db.prepare(
-    `INSERT INTO sellers (name, phone, location, status, email, category)
+  await db
+    .prepare(
+      `INSERT INTO sellers (name, phone, location, status, email, category)
      VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    body.name,
-    body.phone,
-    body.location,
-    "PENDING",
-    email,
-    body.category ?? ""
-  );
+    )
+    .run(
+      body.name,
+      body.phone,
+      body.location,
+      "PENDING",
+      email,
+      body.category ?? ""
+    );
 
   return NextResponse.json(
     {

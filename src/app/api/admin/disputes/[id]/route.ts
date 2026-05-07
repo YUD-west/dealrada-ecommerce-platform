@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 const toReference = (value: string) => {
@@ -20,14 +19,13 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   const { id } = await params;
-  initDb();
   const body = (await request.json()) as { status?: "OPEN" | "RESOLVED" };
   if (!body.status) {
     return NextResponse.json({ error: "Status required." }, { status: 400 });
   }
 
   const reference = toReference(id);
-  const result = db
+  const result = await db
     .prepare(`UPDATE disputes SET status = ? WHERE reference = ?`)
     .run(body.status, reference);
 

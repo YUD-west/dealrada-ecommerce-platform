@@ -3,7 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import useLanguage from "@/components/useLanguage";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
 
 const categories = [
   "Groceries",
@@ -107,6 +109,7 @@ const fallbackProducts = [
 ];
 
 export default function CategoriesPage() {
+  const searchParams = useSearchParams();
   const language = useLanguage();
   const t =
     language === "am"
@@ -194,6 +197,15 @@ export default function CategoriesPage() {
   const [minRating, setMinRating] = useState("all");
   const [stockOnly, setStockOnly] = useState(false);
 
+  const qFromUrl = searchParams.get("q")?.trim() ?? "";
+
+  // Sync ?q= from the URL into the search field when navigation changes (e.g. from home search).
+  useEffect(() => {
+    if (qFromUrl) {
+      setSearch(qFromUrl); // eslint-disable-line react-hooks/set-state-in-effect -- URL → input sync
+    }
+  }, [qFromUrl]);
+
   useEffect(() => {
     const loadProducts = async () => {
       try {
@@ -236,10 +248,13 @@ export default function CategoriesPage() {
   }, []);
 
   const filteredProducts = useMemo(() => {
+    const term = search.trim().toLowerCase();
     return apiProducts.filter((product) => {
-      const matchesSearch = product.name
-        .toLowerCase()
-        .includes(search.toLowerCase());
+      const matchesSearch =
+        !term ||
+        product.name.toLowerCase().includes(term) ||
+        product.category.toLowerCase().includes(term) ||
+        product.store.toLowerCase().includes(term);
       const matchesCategory =
         selectedCategory === "All" || product.category === selectedCategory;
 
@@ -284,7 +299,8 @@ export default function CategoriesPage() {
             </div>
             <span className="text-lg font-semibold">DealArada</span>
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link
               href="/cart"
               className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-emerald-200"

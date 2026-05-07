@@ -1,25 +1,23 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT id, label, enabled, sort_order as sortOrder
        FROM payment_methods
        ORDER BY sort_order ASC, label ASC`
     )
-    .all() as Array<{
-      id: string;
-      label: string;
-      enabled: number;
-      sortOrder: number;
-    }>;
+    .all()) as Array<{
+    id: string;
+    label: string;
+    enabled: number;
+    sortOrder: number;
+  }>;
 
   const items = rows.map((row) => ({
     id: row.id,
@@ -35,7 +33,6 @@ export async function POST(request: Request) {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
   const body = (await request.json()) as {
     id?: string;
     label?: string;
@@ -52,9 +49,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const existing = db
+  const existing = (await db
     .prepare(`SELECT id FROM payment_methods WHERE id = ?`)
-    .get(id) as { id?: string } | undefined;
+    .get(id)) as { id?: string } | undefined;
   if (existing?.id) {
     return NextResponse.json(
       { error: "Payment method already exists." },
@@ -68,10 +65,12 @@ export async function POST(request: Request) {
       ? Math.trunc(body.sortOrder)
       : 0;
 
-  db.prepare(
-    `INSERT INTO payment_methods (id, label, enabled, sort_order)
+  await db
+    .prepare(
+      `INSERT INTO payment_methods (id, label, enabled, sort_order)
      VALUES (?, ?, ?, ?)`
-  ).run(id, label, enabled ? 1 : 0, sortOrder);
+    )
+    .run(id, label, enabled ? 1 : 0, sortOrder);
 
   return NextResponse.json(
     { success: true, item: { id, label, enabled, sortOrder } },

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import useLanguage from "@/components/useLanguage";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
+import RiderLiveMap from "@/components/RiderLiveMap";
 import {
   translateTrackingDetail,
   translateTrackingTitle,
@@ -66,7 +68,16 @@ export default function TrackPage() {
           orderIdPlaceholder: "የትዕዛዝ መለያ (ለምሳሌ፣ DA-1023)",
           deliveryEta: "የመድረሻ ጊዜ (ETA)",
           rider: "ራይደር",
-          mapSoon: "የካርታ እይታ በቅርቡ ይጨምራል",
+          mapLegend: "የመስመር ላይ ካርታ",
+          mapNoKey:
+            "ካርታ ለማሳየት በ .env.local ውስጥ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ያክሉ።",
+          mapLoadError: "ካርታ መጫን አልተሳካም።",
+          mapLoading: "ካርታ እየተጫነ ነው…",
+          mapPickup: "መሰብሰቢያ / ሱቅ",
+          mapDropoff: "የመድረሻ አካባቢ",
+          mapRider: "ራይደር (ግምታዊ)",
+          mapDemoNote:
+            "የራይደር ቦታ ለማሳየት ዲሞ ነው፣ እስከ የ GPS API ይቀየራል።",
           failedEnable: "ማስታወቂያዎችን ማንቃት አልተሳካም።",
           enabledSms: "የSMS ማስታወቂያ ተነቅቷል።",
           enabledEmail: "የኢሜይል ማስታወቂያ ተነቅቷል።",
@@ -80,7 +91,16 @@ export default function TrackPage() {
           orderIdPlaceholder: "Order ID (e.g., DA-1023)",
           deliveryEta: "Delivery ETA",
           rider: "Rider",
-          mapSoon: "Live rider map coming soon",
+          mapLegend: "Live map",
+          mapNoKey:
+            "Add NEXT_PUBLIC_GOOGLE_MAPS_API_KEY to .env.local (Maps JavaScript API) to show the map.",
+          mapLoadError: "Could not load Google Maps.",
+          mapLoading: "Loading map…",
+          mapPickup: "Pickup / shop",
+          mapDropoff: "Delivery area",
+          mapRider: "Rider (approximate)",
+          mapDemoNote:
+            "Rider position is a demo until your API sends live GPS.",
           failedEnable: "Failed to enable updates.",
           enabledSms: "SMS updates enabled.",
           enabledEmail: "Email updates enabled.",
@@ -91,7 +111,9 @@ export default function TrackPage() {
   useEffect(() => {
     const loadTracking = async () => {
       try {
-        const response = await fetch("/api/tracking");
+        const response = await fetch(
+          `/api/tracking?orderId=${encodeURIComponent(orderId)}`
+        );
         if (!response.ok) return;
         const data = (await response.json()) as TrackingResponse;
         setTracking(data);
@@ -99,8 +121,8 @@ export default function TrackPage() {
         setTracking(null);
       }
     };
-    loadTracking();
-  }, []);
+    void loadTracking();
+  }, [orderId]);
 
   const steps = tracking?.timeline?.length
     ? tracking.timeline.map((item, index) => ({
@@ -172,7 +194,8 @@ export default function TrackPage() {
           <Link href="/" className="text-lg font-semibold">
             DealArada
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link href="/categories">{t.shop}</Link>
             <Link href="/cart">{t.cart}</Link>
           </div>
@@ -249,8 +272,20 @@ export default function TrackPage() {
                   {language === "am" ? `${t.rider}: ሲሳይ` : `${t.rider}: Sisay`}
                 </div>
               </div>
-              <div className="mt-3 h-40 w-full rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-3 text-xs text-slate-500">
-                {t.mapSoon}
+              <div className="mt-3 w-full">
+                <RiderLiveMap
+                  orderStatus={tracking?.status ?? null}
+                  labels={{
+                    mapLegend: t.mapLegend,
+                    noApiKey: t.mapNoKey,
+                    loadError: t.mapLoadError,
+                    loading: t.mapLoading,
+                    pickupTitle: t.mapPickup,
+                    dropoffTitle: t.mapDropoff,
+                    riderTitle: t.mapRider,
+                    demoNote: t.mapDemoNote,
+                  }}
+                />
               </div>
             </div>
           </div>

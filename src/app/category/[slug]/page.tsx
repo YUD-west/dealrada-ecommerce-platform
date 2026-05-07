@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
 
 const categoryMap: Record<string, { title: string; description: string }> = {
   electronics: {
@@ -46,7 +47,8 @@ export default async function CategoryLandingPage({
           <Link href="/" className="text-lg font-semibold">
             DealArada
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link href="/categories">Categories</Link>
             <Link href="/cart">Cart</Link>
           </div>

@@ -1,21 +1,19 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
-import { getUserBySession } from "@/lib/auth";
+import { getUserBySession, SESSION_COOKIE_NAME } from "@/lib/auth";
 import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
-  initDb();
   const cookieStore = await cookies();
-  const token = cookieStore.get("da_session")?.value ?? null;
-  const user = getUserBySession(token);
+  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value ?? null;
+  const user = await getUserBySession(token);
 
   if (!user) {
     return NextResponse.json({ items: [], total: 0 });
   }
 
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT id, message, channel, status, created_at as createdAt
        FROM notifications
@@ -32,7 +30,6 @@ export async function POST(request: Request) {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
   const body = (await request.json()) as {
     userId?: number | null;
     role?: string | null;
@@ -47,17 +44,19 @@ export async function POST(request: Request) {
     );
   }
 
-  db.prepare(
-    `INSERT INTO notifications (user_id, role, channel, message, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    body.userId ?? null,
-    body.role ?? null,
-    body.channel,
-    body.message,
-    "SENT",
-    new Date().toISOString()
-  );
+  await db
+    .prepare(
+      `INSERT INTO notifications (user_id, role, channel, message, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      body.userId ?? null,
+      body.role ?? null,
+      body.channel,
+      body.message,
+      "SENT",
+      new Date().toISOString()
+    );
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

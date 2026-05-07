@@ -3,15 +3,24 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { Language } from "@/lib/i18n";
 import useLanguage from "@/components/useLanguage";
 import NotificationBell from "@/components/NotificationBell";
 import { setLanguagePreference } from "@/lib/language";
 import AdminLink from "@/components/AdminLink";
+import AuthNav from "@/components/AuthNav";
+import WishlistHeart from "@/components/WishlistHeart";
+import {
+  WISHLIST_STORAGE_KEY,
+  WISHLIST_UPDATED_EVENT,
+} from "@/lib/wishlist";
 
 export default function Home() {
+  const router = useRouter();
   const language = useLanguage();
   const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
   const [flashCountdown, setFlashCountdown] = useState(4 * 60 * 60 + 12 * 60 + 32);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -97,6 +106,8 @@ export default function Home() {
           talkToUs: "እኛን አናግሩ",
           footerTag: "የወሊሶ አካባቢ ገበያ",
           account: "መለያ",
+          signUp: "ተመዝግብ",
+          signOut: "ውጣ",
           wishlist: "የምኞት ዝርዝር",
           home: "መነሻ",
           searchLabel: "ፍለጋ",
@@ -200,6 +211,8 @@ export default function Home() {
           talkToUs: "Talk to us",
           footerTag: "Local marketplace for Woliso",
           account: "Account",
+          signUp: "Sign up",
+          signOut: "Sign out",
           wishlist: "Wishlist",
           home: "Home",
           searchLabel: "Search",
@@ -266,6 +279,36 @@ export default function Home() {
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const readWishlist = () => {
+      try {
+        const raw = window.localStorage.getItem(WISHLIST_STORAGE_KEY);
+        if (!raw) {
+          setWishlistCount(0);
+          return;
+        }
+        const parsed = JSON.parse(raw) as unknown;
+        setWishlistCount(Array.isArray(parsed) ? parsed.length : 0);
+      } catch {
+        setWishlistCount(0);
+      }
+    };
+
+    readWishlist();
+    const onUpdate = () => readWishlist();
+    window.addEventListener(WISHLIST_UPDATED_EVENT, onUpdate);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === WISHLIST_STORAGE_KEY) readWishlist();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(WISHLIST_UPDATED_EVENT, onUpdate);
+      window.removeEventListener("storage", onStorage);
+    };
   }, []);
 
   useEffect(() => {
@@ -365,17 +408,31 @@ export default function Home() {
       )
     : popularSearches;
 
-  const handleSearchSubmit = () => {
-    const trimmed = searchQuery.trim();
-    if (!trimmed) return;
+  const persistRecentSearches = (trimmed: string) => {
     const next = [trimmed, ...recentSearches.filter((item) => item !== trimmed)]
       .slice(0, 5);
     setRecentSearches(next);
-    window.localStorage.setItem(
-      "dealarada-recent-searches",
-      JSON.stringify(next)
-    );
+    try {
+      window.localStorage.setItem(
+        "dealarada-recent-searches",
+        JSON.stringify(next)
+      );
+    } catch {
+      // ignore quota / private mode
+    }
   };
+
+  /** Saves to recent searches and opens category results (same filter as /categories search box). */
+  const runSearch = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    persistRecentSearches(trimmed);
+    setSearchQuery(trimmed);
+    setSearchOpen(false);
+    router.push(`/categories?q=${encodeURIComponent(trimmed)}`);
+  };
+
+  const handleSearchSubmit = () => runSearch(searchQuery);
 
   const categories = useMemo(
     () => [
@@ -493,7 +550,18 @@ export default function Home() {
     [t.footerCategories, t.footerHowItWorks, t.footerSellers, t.footerContact]
   );
 
-  const flashDeals = [
+  const flashDeals: Array<{
+    title: string;
+    price: string;
+    oldPrice: string;
+    badge: string;
+    image: string;
+    rating: number;
+    reviews: number;
+    soldToday: number;
+    stockLeft: number;
+    slug?: string;
+  }> = [
     {
       title: "Smartphone accessories bundle",
       price: "699 ETB",
@@ -507,6 +575,7 @@ export default function Home() {
     },
     {
       title: "Budget earphones",
+      slug: "budget-earphones",
       price: "320 ETB",
       oldPrice: "450 ETB",
       badge: "-25%",
@@ -518,6 +587,7 @@ export default function Home() {
     },
     {
       title: "Women’s casual dress",
+      slug: "womens-casual-dress",
       price: "890 ETB",
       oldPrice: "1,120 ETB",
       badge: "-25%",
@@ -529,6 +599,7 @@ export default function Home() {
     },
     {
       title: "Men’s casual shoes",
+      slug: "mens-casual-shoes",
       price: "1,150 ETB",
       oldPrice: "1,450 ETB",
       badge: "-25%",
@@ -700,6 +771,12 @@ export default function Home() {
               onChange={(event) => setSearchQuery(event.target.value)}
               onFocus={() => setSearchOpen(true)}
               onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  handleSearchSubmit();
+                }
+              }}
             />
             <button
               onClick={handleSearchSubmit}
@@ -720,7 +797,7 @@ export default function Home() {
                         <button
                           type="button"
                           className="font-semibold underline"
-                          onClick={() => setSearchQuery(didYouMean)}
+                          onClick={() => runSearch(didYouMean)}
                         >
                           {didYouMean}
                         </button>
@@ -736,7 +813,7 @@ export default function Home() {
                           <button
                             key={item}
                             type="button"
-                            onClick={() => setSearchQuery(item)}
+                            onClick={() => runSearch(item)}
                             className="rounded-xl bg-slate-50 px-3 py-2 text-left text-sm text-slate-700 hover:bg-emerald-50"
                           >
                             {item}
@@ -753,7 +830,7 @@ export default function Home() {
                           <button
                             key={item}
                             type="button"
-                            onClick={() => setSearchQuery(item)}
+                            onClick={() => runSearch(item)}
                             className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-emerald-200"
                           >
                             {item}
@@ -770,7 +847,7 @@ export default function Home() {
                           <button
                             key={item}
                             type="button"
-                            onClick={() => setSearchQuery(item)}
+                            onClick={() => runSearch(item)}
                             className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-emerald-200"
                           >
                             {item}
@@ -792,7 +869,7 @@ export default function Home() {
                           <button
                             key={item}
                             type="button"
-                            onClick={() => setSearchQuery(item)}
+                            onClick={() => runSearch(item)}
                             className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-emerald-200"
                           >
                             {item}
@@ -899,17 +976,25 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-3 md:flex-nowrap md:justify-end">
             <NotificationBell />
             <AdminLink />
-            <Link
-              href="/login"
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
-            >
-              {t.account}
-            </Link>
+            <AuthNav
+              variant="header"
+              labels={{
+                signUp: t.signUp,
+                signIn: t.signIn,
+                signOut: t.signOut,
+                account: t.account,
+              }}
+            />
             <Link
               href="/wishlist"
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+              className="relative rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
             >
               {t.wishlist}
+              {wishlistCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                  {wishlistCount > 9 ? "9+" : wishlistCount}
+                </span>
+              ) : null}
             </Link>
             <Link
               href="/cart"
@@ -948,6 +1033,22 @@ export default function Home() {
             <a href="#support" className="hover:text-slate-900">
               {t.support}
             </a>
+            <span
+              className="mx-1 hidden h-4 w-px shrink-0 self-center bg-slate-200 sm:block"
+              aria-hidden
+            />
+            <Link
+              href="/register"
+              className="font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              {t.signUp}
+            </Link>
+            <Link
+              href="/login"
+              className="font-semibold text-slate-900 hover:text-emerald-800"
+            >
+              {t.signIn}
+            </Link>
           </nav>
         </div>
       </header>
@@ -1106,8 +1207,17 @@ export default function Home() {
               {flashDeals.map((deal) => (
                 <div
                   key={deal.title}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                 >
+                  {deal.slug ? (
+                    <WishlistHeart
+                      slug={deal.slug}
+                      name={deal.title}
+                      priceLabel={deal.price}
+                      image={deal.image}
+                      className="absolute right-3 top-3 z-10"
+                    />
+                  ) : null}
                   <div className="mb-4 flex items-center justify-between">
                     <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-700">
                       {deal.badge}
@@ -1200,8 +1310,15 @@ export default function Home() {
               {featuredProducts.map((product) => (
                 <div
                   key={product.name}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
+                  className="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-1 hover:shadow-md"
                 >
+                  <WishlistHeart
+                    slug={product.slug}
+                    name={product.name}
+                    priceLabel={product.price}
+                    image={product.image}
+                    className="absolute right-3 top-3 z-10"
+                  />
                   <div className="mb-4 overflow-hidden rounded-xl bg-slate-100">
                     <Image
                       src={product.image}
@@ -1257,8 +1374,15 @@ export default function Home() {
                 <Link
                   key={item.name}
                   href={`/products/${item.slug}`}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
+                  className="relative block rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-200 hover:shadow-md"
                 >
+                  <WishlistHeart
+                    slug={item.slug}
+                    name={item.name}
+                    priceLabel={item.price}
+                    image={item.image}
+                    className="absolute right-3 top-3 z-10"
+                  />
                   <div className="mb-4 overflow-hidden rounded-xl bg-slate-100">
                     <Image
                       src={item.image}
@@ -1534,7 +1658,7 @@ export default function Home() {
             <span className="text-lg">🗂️</span>
             {t.categories}
           </Link>
-          <Link href="/" className="flex flex-col items-center gap-1">
+          <Link href="/categories" className="flex flex-col items-center gap-1">
             <span className="text-lg">🔎</span>
             {t.searchLabel}
           </Link>
@@ -1542,10 +1666,15 @@ export default function Home() {
             <span className="text-lg">🛒</span>
             {t.cart}
           </Link>
-          <Link href="/login" className="flex flex-col items-center gap-1">
-            <span className="text-lg">👤</span>
-            {t.account}
-          </Link>
+          <AuthNav
+            variant="mobile"
+            labels={{
+              signUp: t.signUp,
+              signIn: t.signIn,
+              signOut: t.signOut,
+              account: t.account,
+            }}
+          />
         </div>
       </nav>
     </div>

@@ -1,65 +1,78 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
-import { requireAdmin } from "@/lib/admin";
+import { requireRoles } from "@/lib/access";
+import {
+  coerceNumericId,
+  formatStatusLabel,
+  getSellerProfileForUser,
+  normalizeStatusKey,
+} from "@/lib/marketplace";
 
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const guard = await requireAdmin();
+  const guard = await requireRoles(["ADMIN", "SELLER"]);
   if ("response" in guard) return guard.response;
+  const { user } = guard;
 
   const { id: orderCode } = await params;
-  initDb();
   const body = (await request.json()) as { status?: string };
-  if (!body.status) {
+  if (!body.status?.trim()) {
     return NextResponse.json({ error: "Status required." }, { status: 400 });
   }
 
-  const order = db
-    .prepare(`SELECT id FROM orders WHERE order_code = ?`)
-    .get(orderCode) as { id?: number } | undefined;
+  const order = (await db
+    .prepare(`SELECT id, seller_id FROM orders WHERE order_code = ?`)
+    .get(orderCode)) as { id?: unknown; seller_id?: unknown } | undefined;
 
-  if (!order?.id) {
+  const orderId = coerceNumericId(order?.id);
+  if (!orderId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  db.prepare(`UPDATE orders SET status = ? WHERE id = ?`).run(
-    body.status,
-    order.id
-  );
+  if (user.role !== "ADMIN") {
+    const seller = await getSellerProfileForUser(user);
+    if (!seller || coerceNumericId(order?.seller_id) !== seller.id) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+  }
 
-  db.prepare(
-    `INSERT INTO notifications (user_id, role, channel, message, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(
-    null,
-    "BUYER",
-    "IN_APP",
-    `Order ${orderCode} updated to ${body.status}.`,
-    "SENT",
-    new Date().toISOString()
-  );
+  const status = normalizeStatusKey(body.status);
+  await db.prepare(`UPDATE orders SET status = ? WHERE id = ?`).run(status, orderId);
 
-  const subscriptions = db
+  await db
+    .prepare(
+      `INSERT INTO notifications (user_id, role, channel, message, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      null,
+      "BUYER",
+      "IN_APP",
+      `Order ${orderCode} updated to ${formatStatusLabel(status)}.`,
+      "SENT",
+      new Date().toISOString()
+    );
+
+  const subscriptions = (await db
     .prepare(
       `SELECT channel, contact
        FROM notification_subscriptions
        WHERE order_code = ?`
     )
-    .all(orderCode) as Array<{ channel: string; contact: string | null }>;
+    .all(orderCode)) as Array<{ channel: string; contact: string | null }>;
   const insertNotification = db.prepare(
     `INSERT INTO notifications (user_id, role, channel, message, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
   );
   const now = new Date().toISOString();
   for (const subscription of subscriptions) {
-    insertNotification.run(
+    await insertNotification.run(
       null,
       "BUYER",
       subscription.channel,
-      `Order ${orderCode} updated to ${body.status}${
+      `Order ${orderCode} updated to ${formatStatusLabel(status)}${
         subscription.contact ? ` (${subscription.contact})` : ""
       }.`,
       "SENT",

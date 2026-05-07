@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
+import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
-  initDb();
-  const rows = db
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
+  const rows = (await db
     .prepare(
       `SELECT id, code, type, value, starts_at as startsAt, ends_at as endsAt, status, created_at as createdAt
        FROM promotions
        ORDER BY created_at DESC`
     )
-    .all() as Array<{
+    .all()) as Array<{
     id: number;
     code: string;
     type: string;
@@ -25,7 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  initDb();
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
   const body = (await request.json()) as {
     code?: string;
     type?: string;
@@ -34,25 +38,37 @@ export async function POST(request: Request) {
     endsAt?: string;
   };
 
-  if (!body.code || !body.type || !body.value) {
+  const code = body.code?.trim().toUpperCase() ?? "";
+  const type = body.type?.trim().toUpperCase() ?? "";
+  const value = Number(body.value);
+  if (!code || !type || !Number.isFinite(value) || value <= 0) {
     return NextResponse.json(
       { error: "Code, type, and value required." },
       { status: 400 }
     );
   }
 
-  db.prepare(
-    `INSERT INTO promotions (code, type, value, starts_at, ends_at, status, created_at)
+  if (!["PERCENT", "AMOUNT"].includes(type)) {
+    return NextResponse.json(
+      { error: "Invalid promotion type." },
+      { status: 400 }
+    );
+  }
+
+  await db
+    .prepare(
+      `INSERT INTO promotions (code, type, value, starts_at, ends_at, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    body.code.trim().toUpperCase(),
-    body.type,
-    body.value,
-    body.startsAt ?? null,
-    body.endsAt ?? null,
-    "ACTIVE",
-    new Date().toISOString()
-  );
+    )
+    .run(
+      code,
+      type,
+      Math.trunc(value),
+      body.startsAt?.trim() || null,
+      body.endsAt?.trim() || null,
+      "ACTIVE",
+      new Date().toISOString()
+    );
 
   return NextResponse.json({ success: true }, { status: 201 });
 }

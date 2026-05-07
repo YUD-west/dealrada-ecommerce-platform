@@ -1,25 +1,23 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
-  const summary = db
+  const summary = (await db
     .prepare(
       `SELECT
-        COUNT(*) as totalCount,
-        COALESCE(SUM(change), 0) as totalChange,
-        SUM(CASE WHEN reason = 'ORDER' THEN 1 ELSE 0 END) as orderCount,
-        SUM(CASE WHEN reason = 'MANUAL' THEN 1 ELSE 0 END) as manualCount,
-        COALESCE(SUM(CASE WHEN reason = 'ORDER' THEN change END), 0) as orderChange,
-        COALESCE(SUM(CASE WHEN reason = 'MANUAL' THEN change END), 0) as manualChange
+        COUNT(*)::int as "totalCount",
+        COALESCE(SUM(change), 0)::int as "totalChange",
+        SUM(CASE WHEN reason = 'ORDER' THEN 1 ELSE 0 END)::int as "orderCount",
+        SUM(CASE WHEN reason = 'MANUAL' THEN 1 ELSE 0 END)::int as "manualCount",
+        COALESCE(SUM(CASE WHEN reason = 'ORDER' THEN change END), 0)::int as "orderChange",
+        COALESCE(SUM(CASE WHEN reason = 'MANUAL' THEN change END), 0)::int as "manualChange"
        FROM inventory_adjustments`
     )
-    .get() as {
+    .get()) as {
     totalCount: number;
     totalChange: number;
     orderCount: number | null;
@@ -28,17 +26,17 @@ export async function GET() {
     manualChange: number;
   };
 
-  const daily = db
+  const daily = (await db
     .prepare(
-      `SELECT date(created_at) as day,
-              COUNT(*) as count,
-              COALESCE(SUM(change), 0) as change
+      `SELECT (created_at AT TIME ZONE 'UTC')::date::text as day,
+              COUNT(*)::int as count,
+              COALESCE(SUM(change), 0)::int as change
        FROM inventory_adjustments
-       WHERE created_at >= datetime('now', '-6 days')
-       GROUP BY day
+       WHERE created_at >= CURRENT_TIMESTAMP - INTERVAL '6 days'
+       GROUP BY (created_at AT TIME ZONE 'UTC')::date
        ORDER BY day ASC`
     )
-    .all() as Array<{ day: string; count: number; change: number }>;
+    .all()) as Array<{ day: string; count: number; change: number }>;
 
   return NextResponse.json({
     totalCount: summary.totalCount ?? 0,

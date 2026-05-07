@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import useLanguage from "@/components/useLanguage";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
+import WishlistHeart from "@/components/WishlistHeart";
 
 const productMap: Record<
   string,
@@ -376,6 +378,8 @@ export default function ProductPage() {
           relatedItems: "ተመሳሳይ እቃዎች",
           viewAll: "ሁሉን እይ",
           ratingFormat: "ደረጃ {rating} / 5",
+          wishlistAdd: "ወደ የምኞት ዝርዝር ጨምር",
+          wishlistRemove: "ከዝርዝሩ አስወግድ",
         }
       : {
           categories: "Categories",
@@ -417,6 +421,8 @@ export default function ProductPage() {
           ratingFormat: "Rating {rating} / 5",
           stars: "stars",
           quickFeedbackPlaceholder: "Share quick feedback",
+          wishlistAdd: "Save to wishlist",
+          wishlistRemove: "Remove from wishlist",
         };
   const product =
     productMap[slug ?? ""] ?? {
@@ -431,6 +437,8 @@ export default function ProductPage() {
       stock: 0,
       category: "Other",
     };
+
+  const productExists = Boolean(slug && productMap[slug ?? ""]);
 
   const discountBadge = "25% OFF";
   const categoryLabel =
@@ -538,9 +546,9 @@ export default function ProductPage() {
           return;
         }
         const data = (await response.json()) as {
-          user: { role: string; name: string };
+          user: { role: string; name: string } | null;
         };
-        setAuth(data.user);
+        setAuth(data.user ?? null);
       } catch {
         setAuth(null);
       } finally {
@@ -601,7 +609,8 @@ export default function ProductPage() {
             </div>
             <span className="text-lg font-semibold">DealArada</span>
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link
               href="/categories"
               className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-emerald-200"
@@ -721,12 +730,25 @@ export default function ProductPage() {
             </span>
           </div>
           <div className="space-y-3">
-            <Link
-              href="/checkout"
-              className="inline-flex w-full items-center justify-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
-            >
-              {t.buyNow}
-            </Link>
+            <div className="flex gap-2">
+              <Link
+                href="/checkout"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600"
+              >
+                {t.buyNow}
+              </Link>
+              {productExists && slug ? (
+                <WishlistHeart
+                  slug={slug}
+                  name={localizedName}
+                  priceLabel={product.price}
+                  image={product.image}
+                  className="h-[46px] w-[46px] text-base"
+                  labelAdd={t.wishlistAdd}
+                  labelRemove={t.wishlistRemove}
+                />
+              ) : null}
+            </div>
             <button className="w-full rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200">
               {t.addToCart}
             </button>

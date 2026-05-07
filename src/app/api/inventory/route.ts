@@ -1,20 +1,40 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
-import { requireAdmin } from "@/lib/admin";
+import { requireRoles } from "@/lib/access";
+import { getSellerProfileForUser } from "@/lib/marketplace";
 
 export async function GET() {
-  const guard = await requireAdmin();
+  const guard = await requireRoles(["ADMIN", "SELLER"]);
   if ("response" in guard) return guard.response;
+  const { user } = guard;
 
-  initDb();
-  const rows = db
+  if (user.role === "ADMIN") {
+    const rows = await db
+      .prepare(
+        `SELECT id as productId, name, stock
+         FROM products
+         ORDER BY id DESC`
+      )
+      .all();
+    return NextResponse.json({ items: rows, total: rows.length });
+  }
+
+  const seller = await getSellerProfileForUser(user);
+  if (!seller) {
+    return NextResponse.json(
+      { error: "Seller profile not found." },
+      { status: 404 }
+    );
+  }
+
+  const rows = await db
     .prepare(
       `SELECT id as productId, name, stock
        FROM products
+       WHERE seller_id = ?
        ORDER BY id DESC`
     )
-    .all();
+    .all(seller.id);
 
   return NextResponse.json({ items: rows, total: rows.length });
 }

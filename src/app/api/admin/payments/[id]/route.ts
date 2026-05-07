@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 export async function PATCH(
@@ -11,7 +10,6 @@ export async function PATCH(
   if ("response" in guard) return guard.response;
 
   const { id } = await params;
-  initDb();
   const body = (await request.json()) as {
     enabled?: boolean;
     sortOrder?: number;
@@ -44,7 +42,7 @@ export async function PATCH(
   }
 
   values.push(id);
-  const result = db
+  const result = await db
     .prepare(`UPDATE payment_methods SET ${updates.join(", ")} WHERE id = ?`)
     .run(...values);
 
@@ -66,8 +64,7 @@ export async function DELETE(
   if ("response" in guard) return guard.response;
 
   const { id } = await params;
-  initDb();
-  const result = db
+  const result = await db
     .prepare(`DELETE FROM payment_methods WHERE id = ?`)
     .run(id);
 

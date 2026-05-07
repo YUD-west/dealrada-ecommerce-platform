@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import useLanguage from "@/components/useLanguage";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
 
 export default function CheckoutPage() {
   const language = useLanguage();
@@ -347,7 +348,8 @@ export default function CheckoutPage() {
             </div>
             <span className="text-lg font-semibold">DealArada</span>
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link
               href="/cart"
               className="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-emerald-200"

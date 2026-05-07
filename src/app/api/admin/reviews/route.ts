@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
+import { requireAdmin } from "@/lib/admin";
 
 export async function GET() {
-  initDb();
-  const rows = db
+  const guard = await requireAdmin();
+  if ("response" in guard) return guard.response;
+
+  const rows = await db
     .prepare(
       `SELECT reviews.id, reviews.rating, reviews.note, reviews.photo_url as photoUrl,
               reviews.status, reviews.created_at as createdAt, users.name as author,

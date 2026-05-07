@@ -493,16 +493,18 @@ export default function AdminPage() {
   useEffect(() => {
     const loadAuth = async () => {
       try {
-        const response = await fetch("/api/auth/me");
+        const response = await fetch("/api/auth/me", {
+          credentials: "include",
+        });
         if (!response.ok) {
           setAuth(null);
           setAuthLoading(false);
           return;
         }
         const data = (await response.json()) as {
-          user: { role: string; name: string };
+          user: { role: string; name: string } | null;
         };
-        setAuth(data.user);
+        setAuth(data.user ?? null);
       } catch {
         setAuth(null);
       } finally {
@@ -534,7 +536,10 @@ export default function AdminPage() {
   }, [users, disputes]);
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+    await fetch("/api/auth/logout", {
+      method: "POST",
+      credentials: "include",
+    });
     router.push("/login");
   };
 

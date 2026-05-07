@@ -1,13 +1,11 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 export async function GET(request: Request) {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
   const { searchParams } = new URL(request.url);
   const product = searchParams.get("product")?.trim();
   const reason = searchParams.get("reason")?.trim();
@@ -54,7 +52,7 @@ export async function GET(request: Request) {
   const whereClause = conditions.length
     ? `WHERE ${conditions.join(" AND ")}`
     : "";
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT inventory_adjustments.id, inventory_adjustments.change,
               inventory_adjustments.reason, inventory_adjustments.order_id as orderId,
@@ -66,7 +64,7 @@ export async function GET(request: Request) {
        ORDER BY inventory_adjustments.created_at DESC
        LIMIT ? OFFSET ?`
     )
-    .all(...values, limit, offset) as Array<{
+    .all(...values, limit, offset)) as Array<{
     id: number;
     change: number;
     reason: string | null;

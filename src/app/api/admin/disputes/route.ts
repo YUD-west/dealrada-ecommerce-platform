@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireAdmin } from "@/lib/admin";
 
 const formatStatus = (value: string) =>
@@ -15,14 +14,13 @@ export async function GET() {
   const guard = await requireAdmin();
   if ("response" in guard) return guard.response;
 
-  initDb();
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT id, reference, issue, status, created_at as createdAt
        FROM disputes
        ORDER BY created_at DESC`
     )
-    .all() as Array<{
+    .all()) as Array<{
     id: number;
     reference: string;
     issue: string;

@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 
 const toRef = (id: number) => `DS-${id}`;
 
 export async function GET() {
-  initDb();
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT reference as id, issue, status, created_at as createdAt
        FROM disputes
        ORDER BY created_at DESC
        LIMIT 10`
     )
-    .all() as Array<{
+    .all()) as Array<{
     id: string;
     issue: string;
     status: string;
@@ -24,7 +22,6 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  initDb();
   const body = (await request.json()) as {
     issue?: string;
   };
@@ -38,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   const createdAt = new Date().toISOString();
-  const result = db
+  const result = await db
     .prepare(
       `INSERT INTO disputes (reference, issue, status, created_at)
        VALUES (?, ?, ?, ?)`
@@ -47,7 +44,7 @@ export async function POST(request: Request) {
 
   const id = Number(result.lastInsertRowid);
   const reference = toRef(id);
-  db.prepare(`UPDATE disputes SET reference = ? WHERE id = ?`).run(
+  await db.prepare(`UPDATE disputes SET reference = ? WHERE id = ?`).run(
     reference,
     id
   );

@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 import { requireRoles } from "@/lib/access";
+import { coerceNumericId, getSellerProfileForUser } from "@/lib/marketplace";
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  initDb();
-  const product = db
+  const product = await db
     .prepare(
       `SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
               price, currency, category, rating, stock, image, status
@@ -24,15 +23,49 @@ export async function GET(
   return NextResponse.json({ item: product });
 }
 
+async function assertProductOwnership(
+  userRole: string,
+  userEmail: string | null,
+  productId: string
+) {
+  if (userRole === "ADMIN") return null;
+  if (!userEmail) {
+    return NextResponse.json(
+      { error: "Seller profile not found." },
+      { status: 404 }
+    );
+  }
+
+  const seller = await getSellerProfileForUser({ email: userEmail });
+  if (!seller) {
+    return NextResponse.json(
+      { error: "Seller profile not found." },
+      { status: 404 }
+    );
+  }
+
+  const owner = (await db
+    .prepare(`SELECT seller_id FROM products WHERE id = ?`)
+    .get(productId)) as { seller_id?: unknown } | undefined;
+  if (!owner || coerceNumericId(owner.seller_id) !== seller.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return null;
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const guard = await requireRoles(["SELLER"]);
   if ("response" in guard) return guard.response;
+  const { user } = guard;
 
   const { id } = await params;
-  initDb();
+  const ownershipError = await assertProductOwnership(user.role, user.email, id);
+  if (ownershipError) return ownershipError;
+
   const body = (await request.json()) as {
     name?: string;
     nameAm?: string;
@@ -47,9 +80,9 @@ export async function PATCH(
     status?: string;
   };
 
-  const existing = db
+  const existing = (await db
     .prepare(`SELECT id, stock FROM products WHERE id = ?`)
-    .get(id) as { id?: number; stock?: number } | undefined;
+    .get(id)) as { id?: number; stock?: number } | undefined;
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -60,36 +93,53 @@ export async function PATCH(
       ? Math.trunc(body.stock) - existing.stock
       : 0;
 
-  db.prepare(
-    `UPDATE products
-     SET name = COALESCE(@name, name),
-         name_am = COALESCE(@nameAm, name_am),
-         description = COALESCE(@description, description),
-         description_am = COALESCE(@descriptionAm, description_am),
-         price = COALESCE(@price, price),
-         currency = COALESCE(@currency, currency),
-         category = COALESCE(@category, category),
-         rating = COALESCE(@rating, rating),
-         stock = COALESCE(@stock, stock),
-         image = COALESCE(@image, image),
-         status = COALESCE(@status, status)
-     WHERE id = @id`
-  ).run({ ...body, id });
+  await db
+    .prepare(
+      `UPDATE products
+       SET name = COALESCE(?, name),
+           name_am = COALESCE(?, name_am),
+           description = COALESCE(?, description),
+           description_am = COALESCE(?, description_am),
+           price = COALESCE(?, price),
+           currency = COALESCE(?, currency),
+           category = COALESCE(?, category),
+           rating = COALESCE(?, rating),
+           stock = COALESCE(?, stock),
+           image = COALESCE(?, image),
+           status = COALESCE(?, status)
+       WHERE id = ?`
+    )
+    .run(
+      body.name ?? null,
+      body.nameAm ?? null,
+      body.description ?? null,
+      body.descriptionAm ?? null,
+      body.price ?? null,
+      body.currency ?? null,
+      body.category ?? null,
+      body.rating ?? null,
+      body.stock ?? null,
+      body.image ?? null,
+      body.status ?? null,
+      id
+    );
 
   if (hasStockChange && stockChange !== 0) {
-    db.prepare(
-      `INSERT INTO inventory_adjustments (product_id, change, reason, order_id, created_at)
-       VALUES (?, ?, ?, ?, ?)`
-    ).run(
-      Number(existing.id),
-      stockChange,
-      "MANUAL",
-      null,
-      new Date().toISOString()
-    );
+    await db
+      .prepare(
+        `INSERT INTO inventory_adjustments (product_id, change, reason, order_id, created_at)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(
+        Number(existing.id),
+        stockChange,
+        "MANUAL",
+        null,
+        new Date().toISOString()
+      );
   }
 
-  const updated = db
+  const updated = await db
     .prepare(
       `SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
               price, currency, category, rating, stock, image, status
@@ -106,9 +156,12 @@ export async function DELETE(
 ) {
   const guard = await requireRoles(["SELLER"]);
   if ("response" in guard) return guard.response;
+  const { user } = guard;
 
   const { id } = await params;
-  initDb();
-  db.prepare(`DELETE FROM products WHERE id = ?`).run(id);
+  const ownershipError = await assertProductOwnership(user.role, user.email, id);
+  if (ownershipError) return ownershipError;
+
+  await db.prepare(`DELETE FROM products WHERE id = ?`).run(id);
   return NextResponse.json({ success: true });
 }

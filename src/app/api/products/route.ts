@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
+import { requireRoles } from "@/lib/access";
+import { getSellerProfileForUser } from "@/lib/marketplace";
 
 export async function GET() {
-  initDb();
-  const rows = db
+  const rows = await db
     .prepare(
       `SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
               price, currency, category, rating, stock, image, status
@@ -18,8 +18,11 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  initDb();
-  const body = (await request.json()) as {
+  const guard = await requireRoles(["SELLER", "ADMIN"]);
+  if ("response" in guard) return guard.response;
+  const { user } = guard;
+
+  let body: {
     name?: string;
     nameAm?: string;
     description?: string;
@@ -34,35 +37,75 @@ export async function POST(request: Request) {
     sellerId?: number;
   };
 
-  if (!body.name || !body.description || !body.price || !body.category) {
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  const name = body.name?.trim() ?? "";
+  const description = body.description?.trim() || name;
+  const category = body.category?.trim() || "General";
+  const price = Number(body.price);
+  const stock = body.stock == null ? 1 : Number(body.stock);
+  const rating = Number(body.rating ?? 0);
+
+  if (!name || !description || !category || !Number.isFinite(price) || price <= 0) {
     return NextResponse.json(
       { error: "Missing required fields." },
       { status: 400 }
     );
   }
 
-  const result = db
+  if (!Number.isFinite(stock) || stock < 0) {
+    return NextResponse.json(
+      { error: "Stock must be zero or more." },
+      { status: 400 }
+    );
+  }
+
+  let sellerId: number | null = null;
+  let status = "PENDING";
+  if (user.role === "ADMIN") {
+    const providedSellerId = Number(body.sellerId);
+    sellerId =
+      Number.isFinite(providedSellerId) && providedSellerId > 0
+        ? Math.trunc(providedSellerId)
+        : null;
+    status = body.status?.trim() || "PENDING";
+  } else {
+    const seller = await getSellerProfileForUser(user);
+    if (!seller) {
+      return NextResponse.json(
+        { error: "Seller profile not found." },
+        { status: 404 }
+      );
+    }
+    sellerId = seller.id;
+  }
+
+  const result = await db
     .prepare(
       `INSERT INTO products
        (name, name_am, description, description_am, price, currency, category, rating, stock, image, status, seller_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
-      body.name,
-      body.nameAm ?? null,
-      body.description,
-      body.descriptionAm ?? null,
-      body.price,
-      body.currency ?? "ETB",
-      body.category,
-      body.rating ?? 0,
-      body.stock ?? 0,
-      body.image ?? "/file.svg",
-      body.status ?? "PENDING",
-      body.sellerId ?? null
+      name,
+      body.nameAm?.trim() || null,
+      description,
+      body.descriptionAm?.trim() || null,
+      Math.trunc(price),
+      body.currency?.trim() || "ETB",
+      category,
+      Number.isFinite(rating) ? rating : 0,
+      Math.trunc(stock),
+      body.image?.trim() || "/file.svg",
+      status,
+      sellerId
     );
 
-  const created = db
+  const created = await db
     .prepare(
       `SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
               price, currency, category, rating, stock, image, status

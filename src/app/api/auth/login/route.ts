@@ -1,36 +1,88 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
-import { createSession, verifyPassword } from "@/lib/auth";
+import {
+  createSession,
+  normalizeAuthEmail,
+  normalizeAuthUserRow,
+  SESSION_COOKIE_NAME,
+  sessionCookieOptions,
+  verifyPassword,
+} from "@/lib/auth";
+import { validateEmail, validateLoginPassword } from "@/lib/validation";
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  initDb();
-  const body = (await request.json()) as { email?: string; password?: string };
-  if (!body.email || !body.password) {
-    return NextResponse.json({ error: "Email and password required." }, { status: 400 });
+  let body: { email?: string; password?: string };
+  try {
+    body = (await request.json()) as { email?: string; password?: string };
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const user = db
-    .prepare(`SELECT id, name, email, role, password_hash FROM users WHERE email = ?`)
-    .get(body.email) as
-    | { id: number; name: string; email: string; role: string; password_hash: string | null }
-    | undefined;
+  const emailRaw = body.email ?? "";
+  const password = body.password ?? "";
 
-  if (!user || !verifyPassword(body.password, user.password_hash)) {
-    return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
+  const emailErr = validateEmail(emailRaw);
+  if (emailErr) {
+    return NextResponse.json({ error: emailErr }, { status: 400 });
   }
 
-  const session = createSession(user.id);
-  const cookieStore = await cookies();
-  cookieStore.set("da_session", session.token, {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  const passErr = validateLoginPassword(password);
+  if (passErr) {
+    return NextResponse.json({ error: passErr }, { status: 400 });
+  }
 
-  return NextResponse.json({
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
-  });
+  const email = normalizeAuthEmail(emailRaw);
+
+  try {
+    const user = (await db
+      .prepare(
+        `SELECT id, name, email, role, password_hash FROM users WHERE LOWER(TRIM(email)) = ?`
+      )
+      .get(email)) as
+      | {
+          id: unknown;
+          name: string;
+          email: string;
+          role: string;
+          password_hash: string | null;
+        }
+      | undefined;
+
+    if (!user || !verifyPassword(password, user.password_hash)) {
+      return NextResponse.json(
+        { error: "Invalid email or password." },
+        { status: 401 }
+      );
+    }
+
+    const safeUser = normalizeAuthUserRow({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    });
+    if (!safeUser) {
+      return NextResponse.json(
+        { error: "Sign-in failed. Please try again." },
+        { status: 500 }
+      );
+    }
+
+    const session = await createSession(safeUser.id);
+    const cookieStore = await cookies();
+    cookieStore.set(SESSION_COOKIE_NAME, session.token, sessionCookieOptions());
+
+    return NextResponse.json({
+      user: safeUser,
+    });
+  } catch (e) {
+    console.error("[api/auth/login]", e);
+    return NextResponse.json(
+      { error: "Sign-in failed. Please try again." },
+      { status: 500 }
+    );
+  }
 }

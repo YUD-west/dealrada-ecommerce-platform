@@ -1,5 +1,11 @@
-const CACHE_NAME = "dealarada-v1";
-const CORE_ASSETS = ["/", "/manifest.json", "/dealarada-logo.png"];
+const CACHE_NAME = "dealarada-v2";
+const CORE_ASSETS = [
+  "/",
+  "/manifest.json",
+  "/dealarada-logo.png",
+  "/icon-192.png",
+  "/icon-512.png",
+];
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();

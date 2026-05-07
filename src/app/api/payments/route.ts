@@ -1,16 +1,14 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 
 export async function GET() {
-  initDb();
-  const rows = db
+  const rows = (await db
     .prepare(
       `SELECT id, label, enabled
        FROM payment_methods
        ORDER BY sort_order ASC, label ASC`
     )
-    .all() as Array<{ id: string; label: string; enabled: number }>;
+    .all()) as Array<{ id: string; label: string; enabled: number }>;
 
   const items = rows.map((row) => ({
     id: row.id,
@@ -22,7 +20,6 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  initDb();
   const body = (await request.json()) as {
     provider?: string;
     amount?: number;

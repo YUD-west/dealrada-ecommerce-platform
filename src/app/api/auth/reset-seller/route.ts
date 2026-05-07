@@ -1,25 +1,30 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
-import { initDb } from "@/lib/seed";
 
 export async function POST() {
-  initDb();
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "Not available." }, { status: 404 });
+  }
 
-  const existing = db
+  const existing = (await db
     .prepare(`SELECT id FROM users WHERE role = 'SELLER'`)
-    .get() as { id?: number } | undefined;
+    .get()) as { id?: number } | undefined;
 
   if (existing?.id) {
-    db.prepare(
-      `UPDATE users
+    await db
+      .prepare(
+        `UPDATE users
        SET name = ?, email = ?, password_hash = ?
        WHERE id = ?`
-    ).run("Seller", "yusuf@seller.com", "demo:Seller@2026", existing.id);
+      )
+      .run("Seller", "yusuf@seller.com", "demo:Seller@2026", existing.id);
   } else {
-    db.prepare(
-      `INSERT INTO users (name, email, role, password_hash)
+    await db
+      .prepare(
+        `INSERT INTO users (name, email, role, password_hash)
        VALUES (?, ?, 'SELLER', ?)`
-    ).run("Seller", "yusuf@seller.com", "demo:Seller@2026");
+      )
+      .run("Seller", "yusuf@seller.com", "demo:Seller@2026");
   }
 
   return NextResponse.json({

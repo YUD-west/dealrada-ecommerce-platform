@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
 
 const storeMap: Record<string, { name: string; highlight: string }> = {
   "sheger-fashion": {
@@ -34,7 +35,8 @@ export default async function StoreLandingPage({
           <Link href="/" className="text-lg font-semibold">
             DealArada
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link href="/categories">Categories</Link>
             <Link href="/cart">Cart</Link>
           </div>

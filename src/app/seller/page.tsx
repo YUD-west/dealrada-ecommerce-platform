@@ -1,7 +1,8 @@
- "use client";
+"use client";
 
 import Link from "next/link";
 import { useState } from "react";
+import PublicHeaderAuth from "@/components/PublicHeaderAuth";
 
 const steps = [
   "Submit shop info and product list",
@@ -73,7 +74,8 @@ export default function SellerPage() {
           <Link href="/" className="text-lg font-semibold">
             DealArada
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-slate-600 sm:gap-3">
+            <PublicHeaderAuth />
             <Link href="/categories">Shop</Link>
             <Link href="/checkout">Contact</Link>
           </div>
