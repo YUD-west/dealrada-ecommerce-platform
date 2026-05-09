@@ -22,6 +22,14 @@ export function normalizeStatusKey(value: string) {
   return value.trim().replace(/\s+/g, "_").toUpperCase();
 }
 
+export function slugifyProductName(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "");
+}
+
 export function coerceNumericId(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return Math.trunc(value);

@@ -1,20 +1,41 @@
 import { NextResponse } from "next/server";
 import db from "@/lib/db";
 import { requireRoles } from "@/lib/access";
-import { coerceNumericId, getSellerProfileForUser } from "@/lib/marketplace";
+import {
+  coerceNumericId,
+  getSellerProfileForUser,
+  slugifyProductName,
+} from "@/lib/marketplace";
+
+const PRODUCT_SELECT = `
+  SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
+         price, currency, category, rating, stock, image, status
+  FROM products
+`;
+
+async function getProductByIdentifier(identifier: string) {
+  const numericId = coerceNumericId(identifier);
+  if (numericId != null) {
+    return await db.prepare(`${PRODUCT_SELECT} WHERE id = ?`).get(numericId);
+  }
+
+  const slug = slugifyProductName(identifier);
+  if (!slug) return undefined;
+
+  return await db
+    .prepare(
+      `${PRODUCT_SELECT}
+       WHERE LOWER(REGEXP_REPLACE(TRIM(name), '[^a-z0-9]+', '-', 'g')) = ?`
+    )
+    .get(slug);
+}
 
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const product = await db
-    .prepare(
-      `SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
-              price, currency, category, rating, stock, image, status
-       FROM products WHERE id = ?`
-    )
-    .get(id);
+  const product = await getProductByIdentifier(id);
 
   if (!product) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -63,6 +84,9 @@ export async function PATCH(
   const { user } = guard;
 
   const { id } = await params;
+  if (coerceNumericId(id) == null) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const ownershipError = await assertProductOwnership(user.role, user.email, id);
   if (ownershipError) return ownershipError;
 
@@ -159,6 +183,9 @@ export async function DELETE(
   const { user } = guard;
 
   const { id } = await params;
+  if (coerceNumericId(id) == null) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const ownershipError = await assertProductOwnership(user.role, user.email, id);
   if (ownershipError) return ownershipError;
 
