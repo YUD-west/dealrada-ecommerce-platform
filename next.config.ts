@@ -28,6 +28,21 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    const backendApiUrl = process.env.BACKEND_API_URL?.trim();
+    if (!backendApiUrl) {
+      return { beforeFiles: [] };
+    }
+
+    return {
+      beforeFiles: [
+        {
+          source: "/api/:path*",
+          destination: `${backendApiUrl.replace(/\/$/, "")}/api/:path*`,
+        },
+      ],
+    };
+  },
 };
 
 export default nextConfig;

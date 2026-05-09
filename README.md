@@ -34,3 +34,14 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Deploy Split
+
+For the Vercel frontend + Render backend setup:
+
+1. Deploy this same GitHub repo to Render as a Web Service.
+2. Set the backend database variables on Render: `POSTGRES_URL` or `DATABASE_URL`.
+3. Deploy this same GitHub repo to Vercel for the frontend.
+4. Set `BACKEND_API_URL` on Vercel to your Render service URL, for example `https://dealarada-backend.onrender.com`.
+
+The frontend proxies all `/api/*` traffic to Render through the `beforeFiles` rewrite in `next.config.ts`, so the browser keeps using the Vercel URL while the backend runs on Render.
