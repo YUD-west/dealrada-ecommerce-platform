@@ -1,7 +1,11 @@
 import type { NextConfig } from "next";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 
 process.env.NEXT_TURBOPACK = "0";
 process.env.NEXT_DISABLE_TURBOPACK = "1";
+
+const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
@@ -15,6 +19,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: projectRoot,
   allowedDevOrigins: ["127.0.0.1", "localhost"],
   images: {
     formats: ["image/avif", "image/webp"],
@@ -29,16 +34,24 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    const backendApiUrl = process.env.BACKEND_API_URL?.trim();
-    if (!backendApiUrl) {
+    const raw = process.env.BACKEND_API_URL?.trim();
+    if (!raw) {
       return { beforeFiles: [] };
+    }
+
+    // Service root only (e.g. https://dealarada-api.onrender.com) — not .../api
+    const origin = raw.replace(/\/$/, "");
+    if (!/^https?:\/\//i.test(origin)) {
+      throw new Error(
+        "BACKEND_API_URL must be an absolute URL (e.g. https://your-service.onrender.com)."
+      );
     }
 
     return {
       beforeFiles: [
         {
           source: "/api/:path*",
-          destination: `${backendApiUrl.replace(/\/$/, "")}/api/:path*`,
+          destination: `${origin}/api/:path*`,
         },
       ],
     };

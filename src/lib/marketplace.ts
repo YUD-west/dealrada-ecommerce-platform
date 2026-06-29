@@ -37,8 +37,12 @@ export function coerceNumericId(value: unknown): number | null {
   if (typeof value === "bigint") {
     return Number(value);
   }
-  if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
+  if (typeof value === "string") {
+    const s = value.trim();
+    if (s === "") return null;
+    // Avoid treating slugs (e.g. "budget-earphones") or partial numbers as row ids.
+    if (!/^\d+$/.test(s)) return null;
+    const parsed = Number(s);
     return Number.isFinite(parsed) ? Math.trunc(parsed) : null;
   }
   return null;

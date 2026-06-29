@@ -13,19 +13,29 @@ const PRODUCT_SELECT = `
   FROM products
 `;
 
+/** Route param for PATCH/DELETE must be decimal digits only (trimmed) for BIGINT `products.id`. */
+function productIdDecimalString(raw: string): string | null {
+  const s = raw.trim();
+  return /^\d+$/.test(s) ? s : null;
+}
+
 async function getProductByIdentifier(identifier: string) {
-  const numericId = coerceNumericId(identifier);
-  if (numericId != null) {
-    return await db.prepare(`${PRODUCT_SELECT} WHERE id = ?`).get(numericId);
+  const trimmed = identifier.trim();
+  if (trimmed === "") return undefined;
+
+  if (/^\d+$/.test(trimmed)) {
+    return await db
+      .prepare(`${PRODUCT_SELECT} WHERE id = CAST(? AS BIGINT)`)
+      .get(trimmed);
   }
 
-  const slug = slugifyProductName(identifier);
+  const slug = slugifyProductName(trimmed);
   if (!slug) return undefined;
 
   return await db
     .prepare(
       `${PRODUCT_SELECT}
-       WHERE LOWER(REGEXP_REPLACE(TRIM(name), '[^a-z0-9]+', '-', 'g')) = ?`
+       WHERE LOWER(REGEXP_REPLACE(TRIM(name), '[^a-z0-9]+', '-', 'g')) = CAST(? AS TEXT)`
     )
     .get(slug);
 }
@@ -65,9 +75,14 @@ async function assertProductOwnership(
     );
   }
 
+  const idKey = productIdDecimalString(productId);
+  if (!idKey) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   const owner = (await db
-    .prepare(`SELECT seller_id FROM products WHERE id = ?`)
-    .get(productId)) as { seller_id?: unknown } | undefined;
+    .prepare(`SELECT seller_id FROM products WHERE id = CAST(? AS BIGINT)`)
+    .get(idKey)) as { seller_id?: unknown } | undefined;
   if (!owner || coerceNumericId(owner.seller_id) !== seller.id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -84,7 +99,8 @@ export async function PATCH(
   const { user } = guard;
 
   const { id } = await params;
-  if (coerceNumericId(id) == null) {
+  const idKey = productIdDecimalString(id);
+  if (!idKey) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const ownershipError = await assertProductOwnership(user.role, user.email, id);
@@ -105,8 +121,8 @@ export async function PATCH(
   };
 
   const existing = (await db
-    .prepare(`SELECT id, stock FROM products WHERE id = ?`)
-    .get(id)) as { id?: number; stock?: number } | undefined;
+    .prepare(`SELECT id, stock FROM products WHERE id = CAST(? AS BIGINT)`)
+    .get(idKey)) as { id?: number; stock?: number } | undefined;
   if (!existing) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -131,7 +147,7 @@ export async function PATCH(
            stock = COALESCE(?, stock),
            image = COALESCE(?, image),
            status = COALESCE(?, status)
-       WHERE id = ?`
+       WHERE id = CAST(? AS BIGINT)`
     )
     .run(
       body.name ?? null,
@@ -145,7 +161,7 @@ export async function PATCH(
       body.stock ?? null,
       body.image ?? null,
       body.status ?? null,
-      id
+      idKey
     );
 
   if (hasStockChange && stockChange !== 0) {
@@ -167,9 +183,9 @@ export async function PATCH(
     .prepare(
       `SELECT id, name, name_am as nameAm, description, description_am as descriptionAm,
               price, currency, category, rating, stock, image, status
-       FROM products WHERE id = ?`
+       FROM products WHERE id = CAST(? AS BIGINT)`
     )
-    .get(id);
+    .get(idKey);
 
   return NextResponse.json({ item: updated });
 }
@@ -183,12 +199,15 @@ export async function DELETE(
   const { user } = guard;
 
   const { id } = await params;
-  if (coerceNumericId(id) == null) {
+  const idKey = productIdDecimalString(id);
+  if (!idKey) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const ownershipError = await assertProductOwnership(user.role, user.email, id);
   if (ownershipError) return ownershipError;
 
-  await db.prepare(`DELETE FROM products WHERE id = ?`).run(id);
+  await db
+    .prepare(`DELETE FROM products WHERE id = CAST(? AS BIGINT)`)
+    .run(idKey);
   return NextResponse.json({ success: true });
 }
